@@ -42,6 +42,8 @@ const buttonValidator = v.optional(v.array(v.object({ text: v.string(), url: v.s
 const actionSchema = v.object({
   type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
   message: v.string(), delaySeconds: v.number(), buttons: buttonValidator, replyKeyword: v.optional(v.string()),
+    quickReplies: v.optional(v.array(v.string())),
+    commentReplies: v.optional(v.array(v.string())),
 });
 
 export const createAutomation = mutation({
