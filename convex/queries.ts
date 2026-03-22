@@ -84,3 +84,13 @@ export const listLogs = query({
 });
 
 export const listClients = query({ args: {}, handler: async (ctx) => await ctx.db.query("clients").collect() });
+
+// Dedup check: look for a log entry with this key in the message within last 30 seconds
+export const checkRecentLog = internalQuery({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const recent = await ctx.db.query("logs").withIndex("by_time").order("desc").take(50);
+    const cutoff = Date.now() - 30000; // 30 seconds
+    return recent.some(l => l.timestamp > cutoff && l.message.includes(`[dedup:${key}]`));
+  },
+});
