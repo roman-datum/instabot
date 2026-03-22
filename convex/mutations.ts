@@ -1,8 +1,6 @@
 import { v } from "convex/values";
 import { mutation, internalMutation } from "./_generated/server";
 
-// --- Internal mutations ---
-
 export const ensureClient = internalMutation({
   args: { instagramId: v.string(), token: v.string() },
   handler: async (ctx, { instagramId }) => {
@@ -28,16 +26,11 @@ export const addLog = internalMutation({
   },
 });
 
-// --- Public mutations ---
-
 export const saveIntegration = mutation({
   args: {
-    accessToken: v.string(),
-    pageAccessToken: v.string(),
-    pageId: v.string(),
-    instagramId: v.string(),
-    pageName: v.optional(v.string()),
-    expiresAt: v.optional(v.number()),
+    accessToken: v.string(), pageAccessToken: v.string(),
+    pageId: v.string(), instagramId: v.string(),
+    pageName: v.optional(v.string()), expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const old = await ctx.db.query("integrations").collect();
@@ -45,6 +38,8 @@ export const saveIntegration = mutation({
     return await ctx.db.insert("integrations", { ...args, connectedAt: Date.now() });
   },
 });
+
+const buttonValidator = v.optional(v.array(v.object({ text: v.string(), url: v.string() })));
 
 export const createAutomation = mutation({
   args: {
@@ -56,16 +51,19 @@ export const createAutomation = mutation({
       postFilter: v.union(v.literal("all"), v.literal("selected")),
       selectedPostIds: v.array(v.string()),
     }),
-    action: v.object({
+    actions: v.array(v.object({
       type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
       message: v.string(),
       delaySeconds: v.number(),
-    }),
+      buttons: buttonValidator,
+    })),
   },
-  handler: async (ctx, { name, trigger, action }) => {
+  handler: async (ctx, { name, trigger, actions }) => {
     const automationId = await ctx.db.insert("automations", { name, isActive: true, createdAt: Date.now() });
     await ctx.db.insert("triggers", { automationId, ...trigger });
-    await ctx.db.insert("actions", { automationId, ...action });
+    for (let i = 0; i < actions.length; i++) {
+      await ctx.db.insert("actions", { automationId, step: i, ...actions[i] });
+    }
     return automationId;
   },
 });

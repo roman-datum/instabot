@@ -32,11 +32,20 @@ export default defineSchema({
     selectedPostIds: v.array(v.string()),
   }).index("by_automation", ["automationId"]),
 
+  // Actions: now supports sequences (step 0, 1, 2...)
+  // step 0 = immediate (or with small delay)
+  // step 1+ = follow-up messages
+  // buttons = array of {text, url} for links in message
   actions: defineTable({
     automationId: v.id("automations"),
+    step: v.optional(v.number()), // 0, 1, 2... order of execution
     type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
     message: v.string(),
-    delaySeconds: v.number(),
+    delaySeconds: v.number(), // delay before THIS step fires
+    buttons: v.optional(v.array(v.object({
+      text: v.string(),
+      url: v.string(),
+    }))),
   }).index("by_automation", ["automationId"]),
 
   clients: defineTable({
