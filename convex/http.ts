@@ -6,7 +6,6 @@ const http = httpRouter();
 
 // ==================== OAUTH ====================
 
-// Instagram redirects here after user authorizes
 http.route({
   path: "/auth/callback",
   method: "GET",
@@ -14,13 +13,12 @@ http.route({
     const url = new URL(request.url);
     const code = url.searchParams.get("code");
     const error = url.searchParams.get("error");
-    const frontendUrl = process.env.FRONTEND_URL || "https://instabot-roman-datums-projects.vercel.app";
+    const frontendUrl = process.env.FRONTEND_URL || "https://instabot-virid.vercel.app";
 
     if (error || !code) {
       return Response.redirect(`${frontendUrl}?auth=error`, 302);
     }
 
-    // Strip #_ that Instagram appends
     const cleanCode = code.replace(/#_$/, "");
 
     try {
@@ -30,6 +28,44 @@ http.route({
       console.error("OAuth error:", e.message);
       return Response.redirect(`${frontendUrl}?auth=error`, 302);
     }
+  }),
+});
+
+// ==================== DEAUTHORIZE CALLBACK ====================
+
+http.route({
+  path: "/auth/deauthorize",
+  method: "POST",
+  handler: httpAction(async (_ctx, _request) => {
+    // Meta sends this when user removes your app from their IG account
+    // For personal use: just acknowledge
+    console.log("Deauthorize callback received");
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
+// ==================== DATA DELETION REQUEST ====================
+
+http.route({
+  path: "/auth/delete",
+  method: "POST",
+  handler: httpAction(async (_ctx, _request) => {
+    // Meta requires a data deletion endpoint
+    // Return a confirmation code and status URL
+    const confirmationCode = `del_${Date.now()}`;
+    return new Response(
+      JSON.stringify({
+        url: `https://instabot-virid.vercel.app/?deletion=${confirmationCode}`,
+        confirmation_code: confirmationCode,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }),
 });
 
