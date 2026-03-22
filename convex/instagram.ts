@@ -57,7 +57,7 @@ export const sendPrivateReply = internalAction({
   },
   handler: async (ctx, { token, igUserId, commentId, text, logAutomationId, clientInstagramId }) => {
     try {
-      const url = `${GRAPH_URL}/${igUserId}/messages`;
+      const url = `${GRAPH_URL}/me/messages`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
