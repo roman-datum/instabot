@@ -2,13 +2,19 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
+import type { Id } from "../../convex/_generated/dataModel";
 
 const CONVEX_SITE_URL = "https://merry-puffin-860.eu-west-1.convex.site";
 const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "";
-function getInstagramAuthUrl() {
+function getIgAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/callback`;
   return `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(r)}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`;
 }
+
+type ActionForm = { type: "send_dm"|"reply_comment"|"both"; message: string; delaySeconds: number; buttons: {text:string;url:string}[]; replyKeyword: string };
+type TriggerForm = { type: "dm"|"comment"; matchType: "contains"|"exact"|"starts_with"|"any"; keywords: string; postFilter: "all"|"selected"; selectedPostIds: string };
+const emptyAction = (): ActionForm => ({ type:"send_dm", message:"", delaySeconds:0, buttons:[], replyKeyword:"" });
+const emptyTrigger = (): TriggerForm => ({ type:"comment", matchType:"contains", keywords:"", postFilter:"all", selectedPostIds:"" });
 
 export default function Dashboard() {
   const integration = useQuery(api.queries.getIntegration);
@@ -29,7 +35,7 @@ export default function Dashboard() {
       <div className="section"><IntegrationCard integration={integration}/></div>
       <div className="section">
         <div className="flex-between" style={{marginBottom:16}}><h2 style={{margin:0}}>Автоматизации</h2></div>
-        <CreateAutomation/>
+        <AutomationForm mode="create" />
         {automations?.map(a=><AutomationCard key={a._id} automation={a}/>)}
         {automations?.length===0&&<div className="empty">Нет автоматизаций</div>}
       </div>
@@ -49,6 +55,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 function logBadge(t:string){if(t.includes("sent")||t.includes("replied"))return"badge-green";if(t.includes("error"))return"badge-red";if(t.includes("received"))return"badge-blue";return"badge-yellow";}
 
 function IntegrationCard({integration}:{integration:any}){
@@ -58,19 +65,28 @@ function IntegrationCard({integration}:{integration:any}){
     const exp=integration.expiresAt?new Date(integration.expiresAt).toLocaleDateString("ru"):"—";
     return(<div className="card"><div className="flex-between"><div><h3>@{integration.pageName||integration.instagramId}</h3><div style={{fontSize:13,color:"var(--text2)"}}>ID: {integration.instagramId} · Токен до: {exp}</div></div><button className="danger" onClick={()=>remove()}>Отключить</button></div></div>);
   }
-  return(<div className="card"><div className="flex-between"><div><h3>Instagram не подключён</h3><div style={{fontSize:13,color:"var(--text2)"}}>Бизнес/Creator. Facebook Page не нужна.</div></div><a href={getInstagramAuthUrl()} style={{textDecoration:"none"}}><button className="primary">Войти через Instagram</button></a></div></div>);
+  return(<div className="card"><div className="flex-between"><div><h3>Instagram не подключён</h3><div style={{fontSize:13,color:"var(--text2)"}}>Бизнес/Creator. Facebook Page не нужна.</div></div><a href={getIgAuthUrl()} style={{textDecoration:"none"}}><button className="primary">Войти через Instagram</button></a></div></div>);
 }
 
 function AutomationCard({automation}:{automation:any}){
   const toggle=useMutation(api.mutations.toggleAutomation);
   const del=useMutation(api.mutations.deleteAutomation);
+  const [editing,setEditing]=useState(false);
   const trigger=automation.triggers[0];
   const actions=[...(automation.actions||[])].sort((a:any,b:any)=>(a.step??0)-(b.step??0));
+
+  if(editing){
+    return <AutomationForm mode="edit" automation={automation} onClose={()=>setEditing(false)} />;
+  }
+
   return(
     <div className="card">
       <div className="flex-between" style={{marginBottom:8}}>
         <div className="row" style={{gap:10}}><button className={`toggle ${automation.isActive?"active":""}`} onClick={()=>toggle({id:automation._id})}/><strong>{automation.name}</strong></div>
-        <button onClick={()=>del({id:automation._id})} style={{fontSize:12,padding:"4px 10px"}}>Удалить</button>
+        <div className="row" style={{gap:6,flex:"none"}}>
+          <button onClick={()=>setEditing(true)} style={{fontSize:12,padding:"4px 10px"}}>Редактировать</button>
+          <button onClick={()=>del({id:automation._id})} style={{fontSize:12,padding:"4px 10px",borderColor:"var(--red)",color:"var(--red)"}}>Удалить</button>
+        </div>
       </div>
       {trigger&&<div style={{fontSize:13,color:"var(--text2)",marginBottom:8}}>Триггер: <span className="badge badge-blue">{trigger.type}</span> <span className="badge badge-yellow">{trigger.matchType}</span>{trigger.keywords.length>0&&<div className="keywords-list">{trigger.keywords.map((kw:string,i:number)=><span className="kw-tag" key={i}>{kw}</span>)}</div>}</div>}
       {actions.map((action:any,i:number)=>(
@@ -87,100 +103,112 @@ function AutomationCard({automation}:{automation:any}){
   );
 }
 
-type ActionForm={type:"send_dm"|"reply_comment"|"both";message:string;delaySeconds:number;buttons:{text:string;url:string}[];replyKeyword:string};
-function CreateAutomation(){
-  const create=useMutation(api.mutations.createAutomation);
-  const [open,setOpen]=useState(false);
-  const [name,setName]=useState("");
-  const [triggerType,setTriggerType]=useState<"dm"|"comment">("comment");
-  const [matchType,setMatchType]=useState<"contains"|"exact"|"starts_with"|"any">("contains");
-  const [keywords,setKeywords]=useState("");
-  const [postFilter,setPostFilter]=useState<"all"|"selected">("all");
-  const [selectedPostIds,setSelectedPostIds]=useState("");
-  const empty=():ActionForm=>({type:"send_dm",message:"",delaySeconds:0,buttons:[],replyKeyword:""});
-  const [actions,setActions]=useState<ActionForm[]>([empty()]);
-  const upd=(i:number,p:Partial<ActionForm>)=>setActions(prev=>prev.map((a,idx)=>idx===i?{...a,...p}:a));
-  const addBtn=(i:number)=>setActions(prev=>prev.map((a,idx)=>idx===i?{...a,buttons:[...a.buttons,{text:"",url:""}]}:a));
-  const updBtn=(ai:number,bi:number,f:"text"|"url",v:string)=>setActions(prev=>prev.map((a,i)=>i===ai?{...a,buttons:a.buttons.map((b,j)=>j===bi?{...b,[f]:v}:b)}:a));
-  const rmBtn=(ai:number,bi:number)=>setActions(prev=>prev.map((a,i)=>i===ai?{...a,buttons:a.buttons.filter((_,j)=>j!==bi)}:a));
-  const reset=()=>{setName("");setTriggerType("comment");setMatchType("contains");setKeywords("");setPostFilter("all");setSelectedPostIds("");setActions([empty()]);setOpen(false);};
+function AutomationForm({ mode, automation, onClose }: { mode: "create"|"edit"; automation?: any; onClose?: ()=>void }) {
+  const create = useMutation(api.mutations.createAutomation);
+  const edit = useMutation(api.mutations.editAutomation);
+  const [open, setOpen] = useState(mode === "edit");
 
-  return(
-    <div style={{marginBottom:16}}>
-      {!open&&<button className="primary" onClick={()=>setOpen(true)}>+ Новая автоматизация</button>}
-      {open&&(
-        <div className="card">
-          <h3>Новая автоматизация</h3>
-          <div className="field"><label>Название</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Напр: Лид-магнит"/></div>
-          <div className="row">
-            <div className="field"><label>Триггер</label><select value={triggerType} onChange={e=>setTriggerType(e.target.value as any)}><option value="comment">Комментарий</option><option value="dm">DM</option></select></div>
-            <div className="field"><label>Совпадение</label><select value={matchType} onChange={e=>setMatchType(e.target.value as any)}><option value="contains">Содержит</option><option value="exact">Точное</option><option value="starts_with">Начинается с</option><option value="any">Любое</option></select></div>
-          </div>
-          {matchType!=="any"&&<div className="field"><label>Ключевые слова (запятая)</label><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="хочу, цена"/></div>}
-          {triggerType==="comment"&&(
-            <div className="row">
-              <div className="field"><label>Посты</label><select value={postFilter} onChange={e=>setPostFilter(e.target.value as any)}><option value="all">Все</option><option value="selected">Выбранные</option></select></div>
-              {postFilter==="selected"&&<div className="field"><label>ID постов</label><input value={selectedPostIds} onChange={e=>setSelectedPostIds(e.target.value)}/></div>}
-            </div>
-          )}
+  // Init from existing automation or defaults
+  const existingTrigger = automation?.triggers?.[0];
+  const existingActions = automation?.actions ? [...automation.actions].sort((a:any,b:any)=>(a.step??0)-(b.step??0)) : null;
 
-          {actions.map((action,idx)=>(
-            <div key={idx} style={{background:"var(--bg3)",padding:14,borderRadius:8,marginBottom:10,borderLeft:idx>0?"3px solid var(--accent)":"none"}}>
-              <div className="flex-between" style={{marginBottom:8}}>
-                <strong style={{fontSize:13}}>{idx===0?"Шаг 1 — первое сообщение":`Дожим #${idx} — после ответа`}</strong>
-                {idx>0&&<button onClick={()=>setActions(p=>p.filter((_,i)=>i!==idx))} style={{fontSize:11,padding:"2px 8px"}}>Убрать</button>}
-              </div>
-              <div className="row">
-                <div className="field"><label>Действие</label><select value={action.type} onChange={e=>upd(idx,{type:e.target.value as any})}><option value="send_dm">DM</option><option value="reply_comment">Ответ на комм.</option><option value="both">DM + ответ</option></select></div>
-                <div className="field"><label>Задержка (сек)</label><input type="number" value={action.delaySeconds} onChange={e=>upd(idx,{delaySeconds:Number(e.target.value)})}/></div>
-              </div>
-              <div className="field"><label>Сообщение</label><textarea value={action.message} onChange={e=>upd(idx,{message:e.target.value})} placeholder={idx===0?"Привет! Хочешь получить гайд? Напиши 'Хочу'":"Вот твой гайд! Ссылка ниже 👇"}/></div>
+  const [name, setName] = useState(automation?.name || "");
+  const [trigger, setTrigger] = useState<TriggerForm>(existingTrigger ? {
+    type: existingTrigger.type, matchType: existingTrigger.matchType,
+    keywords: existingTrigger.keywords?.join(", ") || "",
+    postFilter: existingTrigger.postFilter || "all",
+    selectedPostIds: existingTrigger.selectedPostIds?.join(", ") || "",
+  } : emptyTrigger());
 
-              {/* Reply keyword - only for step 0 when there are followups */}
-              {idx===0&&actions.length>1&&(
-                <div className="field">
-                  <label>Кодовое слово для ответа (что юзер должен написать чтобы получить дожим)</label>
-                  <input value={action.replyKeyword} onChange={e=>upd(idx,{replyKeyword:e.target.value})} placeholder="Хочу"/>
-                </div>
-              )}
+  const [actions, setActions] = useState<ActionForm[]>(
+    existingActions ? existingActions.map((a:any) => ({
+      type: a.type, message: a.message, delaySeconds: a.delaySeconds,
+      buttons: a.buttons || [], replyKeyword: a.replyKeyword || "",
+    })) : [emptyAction()]
+  );
 
-              {/* Buttons */}
-              <div style={{marginBottom:8}}>
-                <label>Кнопки-ссылки</label>
-                {action.buttons.map((btn,bi)=>(
-                  <div className="row" key={bi} style={{marginBottom:6}}>
-                    <input placeholder="Текст" value={btn.text} onChange={e=>updBtn(idx,bi,"text",e.target.value)}/>
-                    <input placeholder="https://..." value={btn.url} onChange={e=>updBtn(idx,bi,"url",e.target.value)}/>
-                    <button onClick={()=>rmBtn(idx,bi)} style={{padding:"4px 8px",fontSize:12,flex:"none"}}>✕</button>
-                  </div>
-                ))}
-                <button onClick={()=>addBtn(idx)} style={{fontSize:12,padding:"4px 10px"}}>+ Кнопка-ссылка</button>
-              </div>
-            </div>
-          ))}
+  const upd = (i:number,p:Partial<ActionForm>) => setActions(prev=>prev.map((a,idx)=>idx===i?{...a,...p}:a));
+  const addBtn = (i:number) => setActions(prev=>prev.map((a,idx)=>idx===i?{...a,buttons:[...a.buttons,{text:"",url:""}]}:a));
+  const updBtn = (ai:number,bi:number,f:"text"|"url",v:string) => setActions(prev=>prev.map((a,i)=>i===ai?{...a,buttons:a.buttons.map((b,j)=>j===bi?{...b,[f]:v}:b)}:a));
+  const rmBtn = (ai:number,bi:number) => setActions(prev=>prev.map((a,i)=>i===ai?{...a,buttons:a.buttons.filter((_,j)=>j!==bi)}:a));
 
-          <button onClick={()=>setActions(p=>[...p,{...empty(),delaySeconds:0}])} style={{fontSize:13,marginBottom:12}}>+ Добавить дожим</button>
+  const reset = () => { setName(""); setTrigger(emptyTrigger()); setActions([emptyAction()]); setOpen(false); onClose?.(); };
 
-          <div className="row">
-            <button className="primary" onClick={async()=>{
-              if(!name||!actions[0]?.message)return;
-              // If there are followups but no replyKeyword on step 0, auto-set it
-              const finalActions = actions.map((a,i)=>({
-                type:a.type,message:a.message,delaySeconds:a.delaySeconds,
-                buttons:a.buttons.length>0?a.buttons.filter(b=>b.text&&b.url):undefined,
-                replyKeyword:i===0&&actions.length>1&&a.replyKeyword?a.replyKeyword:undefined,
-              }));
-              await create({
-                name,
-                trigger:{type:triggerType,matchType,keywords:matchType==="any"?[]:keywords.split(",").map(k=>k.trim()).filter(Boolean),postFilter,selectedPostIds:postFilter==="selected"?selectedPostIds.split(",").map(k=>k.trim()).filter(Boolean):[]},
-                actions:finalActions,
-              });
-              reset();
-            }}>Создать</button>
-            <button onClick={reset}>Отмена</button>
-          </div>
+  const save = async () => {
+    if(!name||!actions[0]?.message) return;
+    const triggerData = {
+      type: trigger.type, matchType: trigger.matchType,
+      keywords: trigger.matchType==="any" ? [] : trigger.keywords.split(",").map(k=>k.trim()).filter(Boolean),
+      postFilter: trigger.postFilter,
+      selectedPostIds: trigger.postFilter==="selected" ? trigger.selectedPostIds.split(",").map(k=>k.trim()).filter(Boolean) : [],
+    };
+    const actionsData = actions.map((a,i) => ({
+      type: a.type, message: a.message, delaySeconds: a.delaySeconds,
+      buttons: a.buttons.length>0 ? a.buttons.filter(b=>b.text&&b.url) : undefined,
+      replyKeyword: i===0 && actions.length>1 && a.replyKeyword ? a.replyKeyword : undefined,
+    }));
+
+    if(mode==="edit" && automation) {
+      await edit({ id: automation._id, name, trigger: triggerData, actions: actionsData });
+      onClose?.();
+    } else {
+      await create({ name, trigger: triggerData, actions: actionsData });
+      reset();
+    }
+  };
+
+  if(mode==="create" && !open) return <button className="primary" onClick={()=>setOpen(true)} style={{marginBottom:16}}>+ Новая автоматизация</button>;
+
+  return (
+    <div className="card" style={{marginBottom:16, borderColor: mode==="edit" ? "var(--accent)" : undefined}}>
+      <h3>{mode==="edit" ? `Редактирование: ${automation?.name}` : "Новая автоматизация"}</h3>
+      <div className="field"><label>Название</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Лид-магнит"/></div>
+      <div className="row">
+        <div className="field"><label>Триггер</label><select value={trigger.type} onChange={e=>setTrigger({...trigger,type:e.target.value as any})}><option value="comment">Комментарий</option><option value="dm">DM</option></select></div>
+        <div className="field"><label>Совпадение</label><select value={trigger.matchType} onChange={e=>setTrigger({...trigger,matchType:e.target.value as any})}><option value="contains">Содержит</option><option value="exact">Точное</option><option value="starts_with">Начинается с</option><option value="any">Любое</option></select></div>
+      </div>
+      {trigger.matchType!=="any"&&<div className="field"><label>Ключевые слова (запятая)</label><input value={trigger.keywords} onChange={e=>setTrigger({...trigger,keywords:e.target.value})} placeholder="хочу, цена"/></div>}
+      {trigger.type==="comment"&&(
+        <div className="row">
+          <div className="field"><label>Посты</label><select value={trigger.postFilter} onChange={e=>setTrigger({...trigger,postFilter:e.target.value as any})}><option value="all">Все</option><option value="selected">Выбранные</option></select></div>
+          {trigger.postFilter==="selected"&&<div className="field"><label>ID постов</label><input value={trigger.selectedPostIds} onChange={e=>setTrigger({...trigger,selectedPostIds:e.target.value})}/></div>}
         </div>
       )}
+
+      {actions.map((action,idx)=>(
+        <div key={idx} style={{background:"var(--bg3)",padding:14,borderRadius:8,marginBottom:10,borderLeft:idx>0?"3px solid var(--accent)":"none"}}>
+          <div className="flex-between" style={{marginBottom:8}}>
+            <strong style={{fontSize:13}}>{idx===0?"Шаг 1 — первое сообщение":`Дожим #${idx} — после ответа`}</strong>
+            {idx>0&&<button onClick={()=>setActions(p=>p.filter((_,i)=>i!==idx))} style={{fontSize:11,padding:"2px 8px"}}>Убрать</button>}
+          </div>
+          <div className="row">
+            <div className="field"><label>Действие</label><select value={action.type} onChange={e=>upd(idx,{type:e.target.value as any})}><option value="send_dm">DM</option><option value="reply_comment">Ответ на комм.</option><option value="both">DM + ответ</option></select></div>
+            <div className="field"><label>Задержка (сек)</label><input type="number" value={action.delaySeconds} onChange={e=>upd(idx,{delaySeconds:Number(e.target.value)})}/></div>
+          </div>
+          <div className="field"><label>Сообщение</label><textarea value={action.message} onChange={e=>upd(idx,{message:e.target.value})} placeholder={idx===0?"Привет! Напиши 'Хочу' чтобы получить гайд":"Держи свой гайд! 👇"}/></div>
+          {idx===0&&actions.length>1&&(
+            <div className="field"><label>Кодовое слово для ответа</label><input value={action.replyKeyword} onChange={e=>upd(idx,{replyKeyword:e.target.value})} placeholder="Хочу"/></div>
+          )}
+          <div style={{marginBottom:8}}>
+            <label>Кнопки-ссылки</label>
+            {action.buttons.map((btn,bi)=>(
+              <div className="row" key={bi} style={{marginBottom:6}}>
+                <input placeholder="Текст" value={btn.text} onChange={e=>updBtn(idx,bi,"text",e.target.value)}/>
+                <input placeholder="https://..." value={btn.url} onChange={e=>updBtn(idx,bi,"url",e.target.value)}/>
+                <button onClick={()=>rmBtn(idx,bi)} style={{padding:"4px 8px",fontSize:12,flex:"none"}}>✕</button>
+              </div>
+            ))}
+            <button onClick={()=>addBtn(idx)} style={{fontSize:12,padding:"4px 10px"}}>+ Кнопка-ссылка</button>
+          </div>
+        </div>
+      ))}
+
+      <button onClick={()=>setActions(p=>[...p,{...emptyAction(),delaySeconds:0}])} style={{fontSize:13,marginBottom:12}}>+ Добавить дожим</button>
+
+      <div className="row">
+        <button className="primary" onClick={save}>{mode==="edit"?"Сохранить":"Создать"}</button>
+        <button onClick={reset}>{mode==="edit"?"Отмена":"Отмена"}</button>
+      </div>
     </div>
   );
 }
