@@ -1,24 +1,17 @@
 import { v } from "convex/values";
 import { mutation, internalMutation } from "./_generated/server";
 
-// --- Internal mutations (used by engine) ---
+// --- Internal mutations ---
 
 export const ensureClient = internalMutation({
-  args: {
-    instagramId: v.string(),
-    token: v.string(),
-  },
+  args: { instagramId: v.string(), token: v.string() },
   handler: async (ctx, { instagramId }) => {
     const existing = await ctx.db
       .query("clients")
       .withIndex("by_instagram_id", (q) => q.eq("instagramId", instagramId))
       .first();
     if (existing) return existing._id;
-
-    return await ctx.db.insert("clients", {
-      instagramId,
-      firstSeen: Date.now(),
-    });
+    return await ctx.db.insert("clients", { instagramId, firstSeen: Date.now() });
   },
 });
 
@@ -31,14 +24,11 @@ export const addLog = internalMutation({
     message: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("logs", {
-      ...args,
-      timestamp: Date.now(),
-    });
+    await ctx.db.insert("logs", { ...args, timestamp: Date.now() });
   },
 });
 
-// --- Public mutations (used by frontend) ---
+// --- Public mutations ---
 
 export const saveIntegration = mutation({
   args: {
@@ -47,17 +37,12 @@ export const saveIntegration = mutation({
     pageId: v.string(),
     instagramId: v.string(),
     pageName: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Remove old integrations (single-user mode)
     const old = await ctx.db.query("integrations").collect();
-    for (const o of old) {
-      await ctx.db.delete(o._id);
-    }
-    return await ctx.db.insert("integrations", {
-      ...args,
-      connectedAt: Date.now(),
-    });
+    for (const o of old) await ctx.db.delete(o._id);
+    return await ctx.db.insert("integrations", { ...args, connectedAt: Date.now() });
   },
 });
 
@@ -66,43 +51,21 @@ export const createAutomation = mutation({
     name: v.string(),
     trigger: v.object({
       type: v.union(v.literal("dm"), v.literal("comment")),
-      matchType: v.union(
-        v.literal("contains"),
-        v.literal("exact"),
-        v.literal("starts_with"),
-        v.literal("any")
-      ),
+      matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("starts_with"), v.literal("any")),
       keywords: v.array(v.string()),
       postFilter: v.union(v.literal("all"), v.literal("selected")),
       selectedPostIds: v.array(v.string()),
     }),
     action: v.object({
-      type: v.union(
-        v.literal("send_dm"),
-        v.literal("reply_comment"),
-        v.literal("both")
-      ),
+      type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
       message: v.string(),
       delaySeconds: v.number(),
     }),
   },
   handler: async (ctx, { name, trigger, action }) => {
-    const automationId = await ctx.db.insert("automations", {
-      name,
-      isActive: true,
-      createdAt: Date.now(),
-    });
-
-    await ctx.db.insert("triggers", {
-      automationId,
-      ...trigger,
-    });
-
-    await ctx.db.insert("actions", {
-      automationId,
-      ...action,
-    });
-
+    const automationId = await ctx.db.insert("automations", { name, isActive: true, createdAt: Date.now() });
+    await ctx.db.insert("triggers", { automationId, ...trigger });
+    await ctx.db.insert("actions", { automationId, ...action });
     return automationId;
   },
 });
@@ -119,20 +82,10 @@ export const toggleAutomation = mutation({
 export const deleteAutomation = mutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
-    // Delete triggers
-    const triggers = await ctx.db
-      .query("triggers")
-      .withIndex("by_automation", (q) => q.eq("automationId", id))
-      .collect();
+    const triggers = await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", id)).collect();
     for (const t of triggers) await ctx.db.delete(t._id);
-
-    // Delete actions
-    const actions = await ctx.db
-      .query("actions")
-      .withIndex("by_automation", (q) => q.eq("automationId", id))
-      .collect();
+    const actions = await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", id)).collect();
     for (const a of actions) await ctx.db.delete(a._id);
-
     await ctx.db.delete(id);
   },
 });
