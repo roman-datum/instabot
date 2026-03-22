@@ -4,34 +4,19 @@ import { mutation, internalMutation } from "./_generated/server";
 export const ensureClient = internalMutation({
   args: { instagramId: v.string(), token: v.string() },
   handler: async (ctx, { instagramId }) => {
-    const existing = await ctx.db
-      .query("clients")
-      .withIndex("by_instagram_id", (q) => q.eq("instagramId", instagramId))
-      .first();
+    const existing = await ctx.db.query("clients").withIndex("by_instagram_id", (q) => q.eq("instagramId", instagramId)).first();
     if (existing) return existing._id;
     return await ctx.db.insert("clients", { instagramId, firstSeen: Date.now() });
   },
 });
 
 export const addLog = internalMutation({
-  args: {
-    automationId: v.optional(v.id("automations")),
-    triggerId: v.optional(v.id("triggers")),
-    clientInstagramId: v.string(),
-    eventType: v.string(),
-    message: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("logs", { ...args, timestamp: Date.now() });
-  },
+  args: { automationId: v.optional(v.id("automations")), triggerId: v.optional(v.id("triggers")), clientInstagramId: v.string(), eventType: v.string(), message: v.string() },
+  handler: async (ctx, args) => { await ctx.db.insert("logs", { ...args, timestamp: Date.now() }); },
 });
 
 export const saveIntegration = mutation({
-  args: {
-    accessToken: v.string(), pageAccessToken: v.string(),
-    pageId: v.string(), instagramId: v.string(),
-    pageName: v.optional(v.string()), expiresAt: v.optional(v.number()),
-  },
+  args: { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const old = await ctx.db.query("integrations").collect();
     for (const o of old) await ctx.db.delete(o._id);
@@ -56,6 +41,7 @@ export const createAutomation = mutation({
       message: v.string(),
       delaySeconds: v.number(),
       buttons: buttonValidator,
+      replyKeyword: v.optional(v.string()),
     })),
   },
   handler: async (ctx, { name, trigger, actions }) => {
@@ -70,28 +56,53 @@ export const createAutomation = mutation({
 
 export const toggleAutomation = mutation({
   args: { id: v.id("automations") },
-  handler: async (ctx, { id }) => {
-    const auto = await ctx.db.get(id);
-    if (!auto) return;
-    await ctx.db.patch(id, { isActive: !auto.isActive });
-  },
+  handler: async (ctx, { id }) => { const a = await ctx.db.get(id); if (a) await ctx.db.patch(id, { isActive: !a.isActive }); },
 });
 
 export const deleteAutomation = mutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
-    const triggers = await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", id)).collect();
-    for (const t of triggers) await ctx.db.delete(t._id);
-    const actions = await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", id)).collect();
-    for (const a of actions) await ctx.db.delete(a._id);
+    for (const t of await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", id)).collect()) await ctx.db.delete(t._id);
+    for (const a of await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", id)).collect()) await ctx.db.delete(a._id);
     await ctx.db.delete(id);
   },
 });
 
 export const removeIntegration = mutation({
   args: {},
-  handler: async (ctx) => {
-    const all = await ctx.db.query("integrations").collect();
-    for (const i of all) await ctx.db.delete(i._id);
+  handler: async (ctx) => { for (const i of await ctx.db.query("integrations").collect()) await ctx.db.delete(i._id); },
+});
+
+// Pending followups
+export const createPendingFollowup = internalMutation({
+  args: { clientInstagramId: v.string(), automationId: v.id("automations"), replyKeyword: v.string() },
+  handler: async (ctx, args) => {
+    // Remove existing pending for same client+automation
+    const existing = await ctx.db.query("pendingFollowups").withIndex("by_client", (q) => q.eq("clientInstagramId", args.clientInstagramId)).collect();
+    for (const e of existing) {
+      if (e.automationId === args.automationId) await ctx.db.delete(e._id);
+    }
+    await ctx.db.insert("pendingFollowups", {
+      ...args,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+  },
+});
+
+export const consumePendingFollowup = internalMutation({
+  args: { clientInstagramId: v.string(), text: v.string() },
+  handler: async (ctx, { clientInstagramId, text }) => {
+    const pendings = await ctx.db.query("pendingFollowups").withIndex("by_client", (q) => q.eq("clientInstagramId", clientInstagramId)).collect();
+    const now = Date.now();
+    const lowerText = text.toLowerCase().trim();
+    for (const p of pendings) {
+      if (p.expiresAt < now) { await ctx.db.delete(p._id); continue; }
+      if (lowerText.includes(p.replyKeyword.toLowerCase().trim())) {
+        await ctx.db.delete(p._id);
+        return p.automationId; // Return matched automation ID
+      }
+    }
+    return null;
   },
 });

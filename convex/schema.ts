@@ -21,32 +21,33 @@ export default defineSchema({
   triggers: defineTable({
     automationId: v.id("automations"),
     type: v.union(v.literal("dm"), v.literal("comment")),
-    matchType: v.union(
-      v.literal("contains"),
-      v.literal("exact"),
-      v.literal("starts_with"),
-      v.literal("any")
-    ),
+    matchType: v.union(v.literal("contains"), v.literal("exact"), v.literal("starts_with"), v.literal("any")),
     keywords: v.array(v.string()),
     postFilter: v.union(v.literal("all"), v.literal("selected")),
     selectedPostIds: v.array(v.string()),
   }).index("by_automation", ["automationId"]),
 
-  // Actions: now supports sequences (step 0, 1, 2...)
-  // step 0 = immediate (or with small delay)
-  // step 1+ = follow-up messages
-  // buttons = array of {text, url} for links in message
   actions: defineTable({
     automationId: v.id("automations"),
-    step: v.optional(v.number()), // 0, 1, 2... order of execution
+    step: v.optional(v.number()),
     type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
     message: v.string(),
-    delaySeconds: v.number(), // delay before THIS step fires
-    buttons: v.optional(v.array(v.object({
-      text: v.string(),
-      url: v.string(),
-    }))),
+    delaySeconds: v.number(),
+    buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))),
+    // For step 0: what keyword user should reply with to trigger next steps
+    replyKeyword: v.optional(v.string()),
   }).index("by_automation", ["automationId"]),
+
+  // Pending follow-ups: waiting for user DM reply after Private Reply
+  pendingFollowups: defineTable({
+    clientInstagramId: v.string(),
+    automationId: v.id("automations"),
+    replyKeyword: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(), // 7 days
+  })
+    .index("by_client", ["clientInstagramId"])
+    .index("by_expires", ["expiresAt"]),
 
   clients: defineTable({
     instagramId: v.string(),
