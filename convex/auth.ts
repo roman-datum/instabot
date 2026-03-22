@@ -2,7 +2,7 @@
 
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api } from "./_generated/api";
 
 const CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/callback";
 
@@ -28,7 +28,6 @@ export const exchangeAndSave = internalAction({
     const tokenData = await tokenRes.json();
     console.log("Token exchange response:", JSON.stringify(tokenData));
 
-    // Response: { data: [{ access_token, user_id, permissions }] } or direct object
     let shortToken: string;
     let userId: string;
 
@@ -59,10 +58,10 @@ export const exchangeAndSave = internalAction({
     const profile = await profileRes.json();
     console.log("Profile:", JSON.stringify(profile));
 
-    // Step 4: Save integration
-    await ctx.runMutation(internal.mutations.saveIntegration, {
+    // Step 4: Save integration (public mutation via api)
+    await ctx.runMutation(api.mutations.saveIntegration, {
       accessToken: longToken,
-      pageAccessToken: longToken, // Same token for Instagram Login flow
+      pageAccessToken: longToken,
       pageId: userId,
       instagramId: userId,
       pageName: profile.username || profile.name || userId,
