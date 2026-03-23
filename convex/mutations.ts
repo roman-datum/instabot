@@ -15,7 +15,7 @@ export const addLog = internalMutation({
   handler: async (ctx, args) => { await ctx.db.insert("logs", { ...args, timestamp: Date.now() }); },
 });
 
-const integrationArgs = { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()) };
+const integrationArgs = { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()) };
 
 async function doSaveIntegration(ctx: any, args: any) {
   // Upsert: replace if same instagramId exists, otherwise add new

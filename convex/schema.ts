@@ -4,9 +4,9 @@ import { v } from "convex/values";
 export default defineSchema({
   integrations: defineTable({
     accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(),
-    instagramId: v.string(), pageName: v.optional(v.string()),
+    instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()),
     connectedAt: v.number(), expiresAt: v.optional(v.number()),
-  }).index("by_ig_id", ["instagramId"]),
+  }).index("by_ig_id", ["instagramId"]).index("by_igba", ["igBusinessId"]),
 
   automations: defineTable({
     name: v.string(), isActive: v.boolean(), createdAt: v.number(),

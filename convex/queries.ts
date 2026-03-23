@@ -6,7 +6,10 @@ import { query, internalQuery } from "./_generated/server";
 export const getIntegrationByInstagramId = internalQuery({
   args: { instagramId: v.string() },
   handler: async (ctx, { instagramId }) => {
-    return await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
+    // Try app-scoped ID first, then IGBA ID (webhook entry.id format)
+    const byAppId = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
+    if (byAppId) return byAppId;
+    return await ctx.db.query("integrations").withIndex("by_igba", (q) => q.eq("igBusinessId", instagramId)).first();
   },
 });
 
