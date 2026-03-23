@@ -7,8 +7,8 @@ import { t } from "@/lib/i18n";
 import { useSettings } from "@/lib/useSettings";
 
 const CONVEX_SITE_URL = "https://merry-puffin-860.eu-west-1.convex.site";
-const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "";
-const FB_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "";
+const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "1007196891146987";
+const FB_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "352395251025840";
 const ACCESS_CODE = process.env.NEXT_PUBLIC_ACCESS_CODE || "botmake2026";
 function getIgAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/callback`;
