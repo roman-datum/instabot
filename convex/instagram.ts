@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-const GRAPH_URL = "https://graph.instagram.com/v19.0";
+const GRAPH_URL = "https://graph.instagram.com/v25.0";
 
 export const sendDm = internalAction({
   args: { token: v.string(), recipientId: v.string(), text: v.string(), logAutomationId: v.id("automations"), clientInstagramId: v.string(), quickReplies: v.optional(v.array(v.string())), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) },
