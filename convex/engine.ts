@@ -8,17 +8,11 @@ function pickRandom(arr: string[]): string { return arr[Math.floor(Math.random()
 export const handleDm = internalAction({
   args: { senderId: v.string(), recipientId: v.string(), text: v.string(), messageId: v.optional(v.string()) },
   handler: async (ctx, { senderId, recipientId, text }) => {
-    // recipientId = the IG account that received the DM (from entry.id)
     let integ = await ctx.runQuery(internal.queries.getIntegrationByInstagramId, { instagramId: recipientId });
-    if (!integ) {
-      const all = await ctx.runQuery(internal.queries.getAllIntegrations);
-      integ = all.find((i: any) => i.instagramId !== senderId) || null;
-    }
+    if (!integ) { const all = await ctx.runQuery(internal.queries.getAllIntegrations); integ = all.find((i: any) => i.instagramId !== senderId) || null; }
     if (!integ || senderId === integ.instagramId) return;
-
     await ctx.runMutation(internal.mutations.ensureClient, { instagramId: senderId, token: integ.pageAccessToken });
 
-    // 1. Check pending followups
     const matchedAutoId = await ctx.runMutation(internal.mutations.consumePendingFollowup, { clientInstagramId: senderId, text });
     if (matchedAutoId) {
       await ctx.runMutation(internal.mutations.addLog, { automationId: matchedAutoId, clientInstagramId: senderId, eventType: "followup_triggered", message: `[@${integ.pageName}] "${text}"` });
@@ -34,10 +28,8 @@ export const handleDm = internalAction({
       return;
     }
 
-    // 2. Regular DM triggers -- scoped to the account that received the DM
     const matches = await ctx.runQuery(internal.queries.findMatchingTriggersForIntegration, { integrationId: integ._id, type: "dm", text, mediaId: "" });
     if (matches.length === 0) return;
-
     await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "dm_matched", message: `[@${integ.pageName}] ${text}` });
     for (const match of matches) {
       const actions = await ctx.runQuery(internal.queries.getActionsByAutomation, { automationId: match.automationId });
@@ -58,25 +50,13 @@ export const handleDm = internalAction({
 export const handleComment = internalAction({
   args: { commentId: v.string(), text: v.string(), senderId: v.string(), mediaId: v.string(), accountId: v.string() },
   handler: async (ctx, { commentId, text, senderId, mediaId, accountId }) => {
-    // accountId = entry.id from webhook = the IG account that OWNS the post
-    // Find integration by accountId -- this is the correct account
     let integ = await ctx.runQuery(internal.queries.getIntegrationByInstagramId, { instagramId: accountId });
+    if (!integ) { const all = await ctx.runQuery(internal.queries.getAllIntegrations); integ = all.find((i: any) => i.instagramId !== senderId) || null; }
+    if (!integ || senderId === integ.instagramId) return;
 
-    if (!integ) {
-      // Fallback: try all (in case ID format differs)
-      const all = await ctx.runQuery(internal.queries.getAllIntegrations);
-      integ = all.find((i: any) => i.instagramId !== senderId) || null;
-      if (!integ) return;
-    }
-
-    // Don't respond to own comments
-    if (senderId === integ.instagramId) return;
-
-    // Dedup
     const existing = await ctx.runQuery(internal.queries.checkRecentLog, { key: `comment:${commentId}` });
     if (existing) return;
 
-    // Find triggers ONLY for this account's automations
     const matches = await ctx.runQuery(internal.queries.findMatchingTriggersForIntegration, { integrationId: integ._id, type: "comment", text, mediaId });
     if (matches.length === 0) return;
 
@@ -90,27 +70,27 @@ export const handleComment = internalAction({
       if (!step0) continue;
       const d0 = step0.delaySeconds || 0;
 
-      // Public reply to comment
+      // Reply to comment (public) -- independent, errors don't block DM
       if (step0.type === "reply_comment" || step0.type === "both") {
         try {
           const cr = step0.commentReplies;
-          const rt = (cr && cr.length > 0) ? pickRandom(cr) : step0.message;
+          const rt = (cr?.length) ? pickRandom(cr) : step0.message;
           const rArgs = { token: integ.pageAccessToken, commentId, text: rt, logAutomationId: match.automationId, clientInstagramId: senderId };
           if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.replyComment, rArgs);
           else await ctx.runAction(internal.instagram.replyComment, rArgs);
         } catch (e: any) {
-          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `replyComment crashed: ${e.message}` });
+          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `replyComment failed: ${e.message}` });
         }
       }
 
-      // Private Reply DM
+      // Private Reply DM -- independent, errors don't block reply
       if (step0.type === "send_dm" || step0.type === "both") {
         try {
           const prArgs = { token: integ.pageAccessToken, igUserId: integ.instagramId, commentId, text: step0.message, logAutomationId: match.automationId, clientInstagramId: senderId, quickReplies: step0.quickReplies || undefined, buttons: step0.buttons || undefined };
           if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.sendPrivateReply, prArgs);
           else await ctx.runAction(internal.instagram.sendPrivateReply, prArgs);
         } catch (e: any) {
-          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `sendPrivateReply crashed: ${e.message}` });
+          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `privateReply failed: ${e.message}` });
         }
       }
 
