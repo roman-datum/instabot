@@ -8,7 +8,7 @@ const CONVEX_SITE_URL = "https://merry-puffin-860.eu-west-1.convex.site";
 const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "";
 function getIgAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/callback`;
-  return `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(r)}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments`;
+  return `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(r)}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments&force_reauth=true&enable_fb_login=false`;
 }
 
 type BtnForm={text:string;url:string};
