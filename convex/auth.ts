@@ -4,6 +4,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 const CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/callback";
+const FB_CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/fb-callback";
 
 export const exchangeAndSave = internalAction({
   args: { code: v.string() },
@@ -46,5 +47,63 @@ export const exchangeAndSave = internalAction({
       pageName: profile.username || profile.name || appScopedId,
       expiresAt: Date.now() + expiresIn * 1000,
     });
+  },
+});
+
+export const exchangeAndSaveFb = internalAction({
+  args: { code: v.string() },
+  handler: async (ctx, { code }) => {
+    const appId = process.env.INSTAGRAM_APP_ID!;
+    const appSecret = process.env.INSTAGRAM_APP_SECRET!;
+
+    // 1. Exchange code for Facebook user access token
+    const tokenUrl = `https://graph.facebook.com/v25.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(FB_CALLBACK_URL)}&client_secret=${appSecret}&code=${code}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData = await tokenRes.json();
+    console.log("FB token exchange:", JSON.stringify(tokenData));
+    if (!tokenData.access_token) throw new Error(`FB token exchange failed: ${JSON.stringify(tokenData)}`);
+
+    // 2. Exchange for long-lived user token
+    const longRes = await fetch(`https://graph.facebook.com/v25.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${tokenData.access_token}`);
+    const longData = await longRes.json();
+    const longUserToken = longData.access_token || tokenData.access_token;
+    console.log("FB long-lived token obtained:", !!longUserToken);
+
+    // 3. Get user's Facebook Pages with connected Instagram Business Accounts
+    const pagesRes = await fetch(`https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${longUserToken}`);
+    const pagesData = await pagesRes.json();
+    console.log("FB Pages:", JSON.stringify(pagesData));
+
+    if (!pagesData.data?.length) throw new Error("No Facebook Pages found for this account");
+
+    let connectedCount = 0;
+    for (const page of pagesData.data) {
+      const igAccount = page.instagram_business_account;
+      if (!igAccount) continue;
+
+      const pageToken = page.access_token; // Page tokens from long-lived user tokens are already long-lived
+      const igId = String(igAccount.id);
+      const igUsername = igAccount.username || igAccount.name || igId;
+
+      // 4. Subscribe to webhooks
+      const subRes = await fetch(`https://graph.instagram.com/v25.0/${igId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${pageToken}`, { method: "POST" });
+      const subData = await subRes.json();
+      console.log(`Webhook sub for ${igUsername} (${igId}):`, JSON.stringify(subData));
+
+      // 5. Save integration — igBusinessId = instagramId for FB Login flow
+      await ctx.runMutation(internal.mutations.internalSaveIntegration, {
+        accessToken: pageToken,
+        pageAccessToken: pageToken,
+        pageId: String(page.id),
+        instagramId: igId,
+        igBusinessId: igId,
+        pageName: igUsername,
+        expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // ~60 days
+      });
+      connectedCount++;
+    }
+
+    if (connectedCount === 0) throw new Error("No Instagram Business Accounts connected to your Facebook Pages");
+    console.log(`Connected ${connectedCount} Instagram account(s) via Facebook`);
   },
 });

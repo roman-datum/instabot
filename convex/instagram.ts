@@ -6,14 +6,15 @@ import { internal } from "./_generated/api";
 const GRAPH_URL = "https://graph.instagram.com/v25.0";
 
 export const sendDm = internalAction({
-  args: { token: v.string(), recipientId: v.string(), text: v.string(), logAutomationId: v.id("automations"), clientInstagramId: v.string(), quickReplies: v.optional(v.array(v.string())), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) },
-  handler: async (ctx, { token, recipientId, text, logAutomationId, clientInstagramId, quickReplies, buttons }) => {
+  args: { token: v.string(), igUserId: v.optional(v.string()), recipientId: v.string(), text: v.string(), logAutomationId: v.id("automations"), clientInstagramId: v.string(), quickReplies: v.optional(v.array(v.string())), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) },
+  handler: async (ctx, { token, igUserId, recipientId, text, logAutomationId, clientInstagramId, quickReplies, buttons }) => {
     try {
       let msgText = text;
       if (buttons?.length) for (const btn of buttons) msgText += `\n\n${btn.text}: ${btn.url}`;
       const msgPayload: any = { text: msgText };
       if (quickReplies?.length) msgPayload.quick_replies = quickReplies.map(qr => ({ content_type: "text", title: qr, payload: qr }));
-      const res = await fetch(`${GRAPH_URL}/me/messages`, {
+      const endpoint = igUserId ? `${GRAPH_URL}/${igUserId}/messages` : `${GRAPH_URL}/me/messages`;
+      const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ recipient: { id: recipientId }, message: msgPayload }),
       });
@@ -25,13 +26,14 @@ export const sendDm = internalAction({
 
 export const sendPrivateReply = internalAction({
   args: { token: v.string(), igUserId: v.string(), commentId: v.string(), text: v.string(), logAutomationId: v.id("automations"), clientInstagramId: v.string(), quickReplies: v.optional(v.array(v.string())), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) },
-  handler: async (ctx, { token, commentId, text, logAutomationId, clientInstagramId, quickReplies, buttons }) => {
+  handler: async (ctx, { token, igUserId, commentId, text, logAutomationId, clientInstagramId, quickReplies, buttons }) => {
     try {
       let msgText = text;
       if (buttons?.length) for (const btn of buttons) msgText += `\n\n${btn.text}: ${btn.url}`;
       const msgPayload: any = { text: msgText };
       if (quickReplies?.length) msgPayload.quick_replies = quickReplies.map(qr => ({ content_type: "text", title: qr, payload: qr }));
-      const res = await fetch(`${GRAPH_URL}/me/messages`, {
+      const endpoint = igUserId ? `${GRAPH_URL}/${igUserId}/messages` : `${GRAPH_URL}/me/messages`;
+      const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ recipient: { comment_id: commentId }, message: msgPayload }),
       });

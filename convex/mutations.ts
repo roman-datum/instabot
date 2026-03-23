@@ -18,8 +18,11 @@ export const addLog = internalMutation({
 const integrationArgs = { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()) };
 
 async function doSaveIntegration(ctx: any, args: any) {
-  // Upsert: replace if same instagramId exists, otherwise add new
-  const existing = await ctx.db.query("integrations").withIndex("by_ig_id", (q: any) => q.eq("instagramId", args.instagramId)).first();
+  // Upsert: check instagramId first, then igBusinessId (handles IG Login → FB Login reconnect)
+  let existing = await ctx.db.query("integrations").withIndex("by_ig_id", (q: any) => q.eq("instagramId", args.instagramId)).first();
+  if (!existing && args.igBusinessId) {
+    existing = await ctx.db.query("integrations").withIndex("by_igba", (q: any) => q.eq("igBusinessId", args.igBusinessId)).first();
+  }
   if (existing) {
     await ctx.db.patch(existing._id, { ...args, connectedAt: Date.now() });
     return existing._id;

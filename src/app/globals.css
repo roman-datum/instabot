@@ -402,6 +402,79 @@ label {
 .requisites-table td { padding: 8px 12px; border: 1px solid var(--border); }
 .requisites-table td:first-child { color: var(--text2); white-space: nowrap; width: 140px; }
 
+/* Connect modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-content {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 20px;
+  position: relative;
+}
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s;
+}
+.modal-close:hover { color: var(--text); background: var(--bg3); }
+.modal-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.modal-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+.connect-options { display: flex; flex-direction: column; gap: 10px; }
+.connect-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.15s ease;
+}
+.connect-option:hover { border-color: var(--accent); background: #6366f108; }
+.connect-option-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.connect-option-icon.ig { background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); }
+.connect-option-icon.fb { background: #0082fb; }
+.connect-option-text { flex: 1; min-width: 0; }
+.connect-option-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.connect-option-desc { font-size: 12px; color: var(--text2); }
+
 /* Light mode card shadows */
 [data-theme="light"] .card,
 [data-theme="light"] .account-card,

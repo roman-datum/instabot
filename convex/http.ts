@@ -14,6 +14,14 @@ http.route({ path: "/auth/callback", method: "GET", handler: httpAction(async (c
   catch (e: any) { console.error("OAuth error:", e.message); return Response.redirect(`${frontendUrl}?auth=error`, 302); }
 })});
 
+http.route({ path: "/auth/fb-callback", method: "GET", handler: httpAction(async (ctx, request) => {
+  const url = new URL(request.url); const code = url.searchParams.get("code"); const error = url.searchParams.get("error");
+  const frontendUrl = process.env.FRONTEND_URL || FRONTEND;
+  if (error || !code) return Response.redirect(`${frontendUrl}?auth=error`, 302);
+  try { await ctx.runAction(internal.auth.exchangeAndSaveFb, { code }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
+  catch (e: any) { console.error("FB OAuth error:", e.message); return Response.redirect(`${frontendUrl}?auth=error`, 302); }
+})});
+
 http.route({ path: "/auth/deauthorize", method: "POST", handler: httpAction(async (ctx, request) => {
   try {
     const body = await request.text();
