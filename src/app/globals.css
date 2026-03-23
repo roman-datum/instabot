@@ -227,3 +227,6 @@ label {
   margin-bottom: 24px;
 }
 .deletion-status h2 { margin-top: 0; color: var(--green); }
+.requisites-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
+.requisites-table td { padding: 8px 12px; border: 1px solid var(--border); }
+.requisites-table td:first-child { color: var(--text2); white-space: nowrap; width: 140px; }
