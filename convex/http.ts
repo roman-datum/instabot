@@ -42,23 +42,30 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const body = await request.json();
 
+    // Log every incoming webhook for debugging
+    await ctx.runMutation(internal.mutations.addLog, {
+      clientInstagramId: "webhook",
+      eventType: "webhook_received",
+      message: `entries:${(body.entry || []).length} object:${body.object} raw:${JSON.stringify(body).slice(0, 200)}`,
+    });
+
     for (const entry of body.entry || []) {
       // entry.id = the IG account ID that OWNS the content (post owner / DM recipient)
       const entryAccountId = String(entry.id || "");
 
-      // DM messages
+      // DM messages — schedule async so we return 200 immediately
       if (entry.messaging) {
         for (const event of entry.messaging) {
           const senderId = String(event.sender?.id);
           const recipientId = String(event.recipient?.id);
           if (event.message?.text) {
-            await ctx.runAction(internal.engine.handleDm, {
+            await ctx.scheduler.runAfter(0, internal.engine.handleDm, {
               senderId, recipientId: entryAccountId || recipientId,
               text: event.message.text, messageId: event.message.mid || "",
             });
           }
           if (event.postback?.title) {
-            await ctx.runAction(internal.engine.handleDm, {
+            await ctx.scheduler.runAfter(0, internal.engine.handleDm, {
               senderId, recipientId: entryAccountId || recipientId,
               text: event.postback.title, messageId: "",
             });
@@ -66,12 +73,12 @@ http.route({
         }
       }
 
-      // Comment events -- pass entryAccountId so engine knows WHICH account owns the post
+      // Comment events — schedule async so we return 200 immediately
       if (entry.changes) {
         for (const change of entry.changes) {
           if (change.field === "comments" && change.value) {
             const val = change.value;
-            await ctx.runAction(internal.engine.handleComment, {
+            await ctx.scheduler.runAfter(0, internal.engine.handleComment, {
               commentId: String(val.id),
               text: val.text || "",
               senderId: String(val.from?.id),

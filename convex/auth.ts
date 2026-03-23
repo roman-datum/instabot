@@ -30,12 +30,12 @@ export const exchangeAndSave = internalAction({
     const expiresIn = longData.expires_in || 3600;
 
     // Step 3: Get profile
-    const profileRes = await fetch(`https://graph.instagram.com/v19.0/me?fields=user_id,username,name,id&access_token=${longToken}`);
+    const profileRes = await fetch(`https://graph.instagram.com/v25.0/me?fields=user_id,username,name,id&access_token=${longToken}`);
     const profile = await profileRes.json();
     const igAppScopedId = profile.id || profile.user_id;
 
     // Step 4: Subscribe to webhooks (messages, comments, postbacks)
-    const subRes = await fetch(`https://graph.instagram.com/v19.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${longToken}`, {
+    const subRes = await fetch(`https://graph.instagram.com/v25.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${longToken}`, {
       method: "POST",
     });
     const subData = await subRes.json();

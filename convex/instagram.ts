@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-const GRAPH_URL = "https://graph.instagram.com/v19.0";
+const GRAPH_URL = "https://graph.instagram.com/v25.0";
 
 // Regular DM (for follow-up after user replies)
 export const sendDm = internalAction({

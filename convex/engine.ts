@@ -92,18 +92,26 @@ export const handleComment = internalAction({
 
       // Public reply to comment
       if (step0.type === "reply_comment" || step0.type === "both") {
-        const cr = step0.commentReplies;
-        const rt = (cr && cr.length > 0) ? pickRandom(cr) : step0.message;
-        const rArgs = { token: integ.pageAccessToken, commentId, text: rt, logAutomationId: match.automationId, clientInstagramId: senderId };
-        if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.replyComment, rArgs);
-        else await ctx.runAction(internal.instagram.replyComment, rArgs);
+        try {
+          const cr = step0.commentReplies;
+          const rt = (cr && cr.length > 0) ? pickRandom(cr) : step0.message;
+          const rArgs = { token: integ.pageAccessToken, commentId, text: rt, logAutomationId: match.automationId, clientInstagramId: senderId };
+          if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.replyComment, rArgs);
+          else await ctx.runAction(internal.instagram.replyComment, rArgs);
+        } catch (e: any) {
+          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `replyComment crashed: ${e.message}` });
+        }
       }
 
       // Private Reply DM
       if (step0.type === "send_dm" || step0.type === "both") {
-        const prArgs = { token: integ.pageAccessToken, igUserId: integ.instagramId, commentId, text: step0.message, logAutomationId: match.automationId, clientInstagramId: senderId, quickReplies: step0.quickReplies || undefined, buttons: step0.buttons || undefined };
-        if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.sendPrivateReply, prArgs);
-        else await ctx.runAction(internal.instagram.sendPrivateReply, prArgs);
+        try {
+          const prArgs = { token: integ.pageAccessToken, igUserId: integ.instagramId, commentId, text: step0.message, logAutomationId: match.automationId, clientInstagramId: senderId, quickReplies: step0.quickReplies || undefined, buttons: step0.buttons || undefined };
+          if (d0 > 0) await ctx.scheduler.runAfter(d0 * 1000, internal.instagram.sendPrivateReply, prArgs);
+          else await ctx.runAction(internal.instagram.sendPrivateReply, prArgs);
+        } catch (e: any) {
+          await ctx.runMutation(internal.mutations.addLog, { automationId: match.automationId, clientInstagramId: senderId, eventType: "error", message: `sendPrivateReply crashed: ${e.message}` });
+        }
       }
 
       // Register pending followup
