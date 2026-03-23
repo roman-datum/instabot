@@ -26,29 +26,18 @@ export const exchangeAndSave = internalAction({
     const longToken = longData.access_token || shortToken;
     const expiresIn = longData.expires_in || 3600;
 
-<<<<<<< HEAD
-    // Step 3: Get profile
-=======
     // Get profile: id = app-scoped, user_id = Instagram Business Account ID
->>>>>>> aff95c7c5978220e3fa3a37b3e659b7d6a376024
     const profileRes = await fetch(`https://graph.instagram.com/v25.0/me?fields=user_id,username,name,id&access_token=${longToken}`);
     const profile = await profileRes.json();
     console.log("Profile:", JSON.stringify(profile));
 
-<<<<<<< HEAD
-    // Step 4: Subscribe to webhooks (messages, comments, postbacks)
-    const subRes = await fetch(`https://graph.instagram.com/v25.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${longToken}`, {
-      method: "POST",
-    });
-    const subData = await subRes.json();
-    console.log("Webhook subscription:", JSON.stringify(subData));
-=======
     const appScopedId = profile.id;
-    const igBusinessId = profile.user_id; // This is what webhook entry.id sends
+    const igBusinessId = profile.user_id;
 
     // Subscribe to webhooks
-    await fetch(`https://graph.instagram.com/v25.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${longToken}`, { method: "POST" });
->>>>>>> aff95c7c5978220e3fa3a37b3e659b7d6a376024
+    const subRes = await fetch(`https://graph.instagram.com/v25.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments&access_token=${longToken}`, { method: "POST" });
+    const subData = await subRes.json();
+    console.log("Webhook subscription:", JSON.stringify(subData));
 
     await ctx.runMutation(internal.mutations.internalSaveIntegration, {
       accessToken: longToken, pageAccessToken: longToken,

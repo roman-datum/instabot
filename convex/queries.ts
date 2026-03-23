@@ -4,19 +4,10 @@ import { query, internalQuery } from "./_generated/server";
 export const getIntegrationByInstagramId = internalQuery({
   args: { instagramId: v.string() },
   handler: async (ctx, { instagramId }) => {
-<<<<<<< HEAD
     // Try app-scoped ID first, then IGBA ID (webhook entry.id format)
     const byAppId = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
     if (byAppId) return byAppId;
     return await ctx.db.query("integrations").withIndex("by_igba", (q) => q.eq("igBusinessId", instagramId)).first();
-=======
-    // Try app-scoped ID first
-    let r = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
-    if (r) return r;
-    // Try igBusinessId (webhook entry.id uses this)
-    const all = await ctx.db.query("integrations").collect();
-    return all.find(i => i.igBusinessId === instagramId) ?? null;
->>>>>>> aff95c7c5978220e3fa3a37b3e659b7d6a376024
   },
 });
 
@@ -27,7 +18,6 @@ export const findMatchingTriggersForIntegration = internalQuery({
   handler: async (ctx, { integrationId, type, text, mediaId }) => {
     const autos = await ctx.db.query("automations").withIndex("by_integration", (q) => q.eq("integrationId", integrationId)).collect();
     const activeIds = autos.filter(a => a.isActive).map(a => a._id);
-    // Legacy automations without integrationId
     const legacy = await ctx.db.query("automations").collect();
     for (const la of legacy) { if (la.isActive && !la.integrationId && !activeIds.includes(la._id)) activeIds.push(la._id); }
 

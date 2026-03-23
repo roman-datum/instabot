@@ -45,5 +45,5 @@ export default defineSchema({
   logs: defineTable({
     automationId: v.optional(v.id("automations")), triggerId: v.optional(v.id("triggers")),
     clientInstagramId: v.string(), eventType: v.string(), message: v.string(), timestamp: v.number(),
-  }).index("by_time", ["timestamp"]),
+  }).index("by_time", ["timestamp"]).index("by_client", ["clientInstagramId"]),
 });

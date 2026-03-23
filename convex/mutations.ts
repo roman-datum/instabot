@@ -100,6 +100,43 @@ export const removeIntegration = mutation({
   },
 });
 
+export const deleteUserData = internalMutation({
+  args: { instagramId: v.string() },
+  handler: async (ctx, { instagramId }) => {
+    const integ = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
+    if (integ) {
+      const autos = await ctx.db.query("automations").withIndex("by_integration", (q) => q.eq("integrationId", integ._id)).collect();
+      for (const a of autos) {
+        for (const t of await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(t._id);
+        for (const ac of await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(ac._id);
+        await ctx.db.delete(a._id);
+      }
+      await ctx.db.delete(integ._id);
+    }
+    const client = await ctx.db.query("clients").withIndex("by_instagram_id", (q) => q.eq("instagramId", instagramId)).first();
+    if (client) await ctx.db.delete(client._id);
+    const followups = await ctx.db.query("pendingFollowups").withIndex("by_client", (q) => q.eq("clientInstagramId", instagramId)).collect();
+    for (const f of followups) await ctx.db.delete(f._id);
+    const logs = await ctx.db.query("logs").withIndex("by_client", (q) => q.eq("clientInstagramId", instagramId)).collect();
+    for (const l of logs) await ctx.db.delete(l._id);
+  },
+});
+
+export const deauthorizeUser = internalMutation({
+  args: { instagramId: v.string() },
+  handler: async (ctx, { instagramId }) => {
+    const integ = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
+    if (!integ) return;
+    const autos = await ctx.db.query("automations").withIndex("by_integration", (q) => q.eq("integrationId", integ._id)).collect();
+    for (const a of autos) {
+      for (const t of await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(t._id);
+      for (const ac of await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(ac._id);
+      await ctx.db.delete(a._id);
+    }
+    await ctx.db.delete(integ._id);
+  },
+});
+
 export const createPendingFollowup = internalMutation({
   args: { clientInstagramId: v.string(), automationId: v.id("automations"), replyKeyword: v.string() },
   handler: async (ctx, args) => {

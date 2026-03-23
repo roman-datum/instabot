@@ -38,9 +38,10 @@ export default function Dashboard(){
 
   const selected=integrations?.find(i=>i._id===selectedId);
 
+  if(integrations===undefined) return <div className="container"><div className="empty">Загрузка...</div></div>;
+
   return(
     <div className="container">
-      <h1>InstaBot</h1>
       {authMsg&&<div className="card" style={{background:authMsg.includes("Ошибка")?"#2a1515":"#152a15",marginBottom:16}}>{authMsg}</div>}
 
       {/* Accounts */}
