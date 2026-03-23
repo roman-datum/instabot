@@ -6,6 +6,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 const CONVEX_SITE_URL = "https://merry-puffin-860.eu-west-1.convex.site";
 const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "";
+const ACCESS_CODE = process.env.NEXT_PUBLIC_ACCESS_CODE || "botmake2026";
 function getIgAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/callback`;
   return `https://www.instagram.com/oauth/authorize?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(r)}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments&force_reauth=true&enable_fb_login=false`;
@@ -17,7 +18,17 @@ type TriggerForm={type:"dm"|"comment";matchType:"contains"|"exact"|"starts_with"
 const emptyAction=():ActionForm=>({type:"send_dm",message:"",delaySeconds:0,buttons:[],replyKeyword:"",quickReplies:[],commentReplies:[]});
 const emptyTrigger=():TriggerForm=>({type:"comment",matchType:"contains",keywords:"",postFilter:"all",selectedPostIds:""});
 
+function useAuth() {
+  const [ok, setOk] = useState(false);
+  const [input, setInput] = useState("");
+  useEffect(() => { if (typeof window !== "undefined" && localStorage.getItem("bm_auth") === ACCESS_CODE) setOk(true); }, []);
+  const login = () => { if (input === ACCESS_CODE) { localStorage.setItem("bm_auth", input); setOk(true); } };
+  const logout = () => { localStorage.removeItem("bm_auth"); setOk(false); };
+  return { ok, input, setInput, login, logout };
+}
+
 export default function Dashboard(){
+  const auth = useAuth();
   const integrations=useQuery(api.queries.listIntegrations);
   const logs=useQuery(api.queries.listLogs,{limit:40});
   const [selectedId,setSelectedId]=useState<Id<"integrations">|null>(null);
@@ -38,6 +49,17 @@ export default function Dashboard(){
 
   const selected=integrations?.find(i=>i._id===selectedId);
 
+  if (!auth.ok) return (
+    <div className="container" style={{maxWidth:400,marginTop:80}}>
+      <div className="card" style={{textAlign:"center"}}>
+        <h2 style={{marginBottom:16}}>BotMake Direct</h2>
+        <p style={{color:"var(--text2)",marginBottom:20,fontSize:14}}>Введите код доступа для входа в панель управления</p>
+        <div className="field"><input type="password" placeholder="Код доступа" value={auth.input} onChange={e=>auth.setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&auth.login()}/></div>
+        <button className="primary" onClick={auth.login} style={{width:"100%"}}>Войти</button>
+      </div>
+    </div>
+  );
+
   if(integrations===undefined) return <div className="container"><div className="empty">Загрузка...</div></div>;
 
   return(
@@ -47,7 +69,7 @@ export default function Dashboard(){
       {/* Accounts */}
       <div className="section">
         <div className="flex-between" style={{marginBottom:12}}>
-          <h2 style={{margin:0}}>Аккаунты</h2>
+          <div className="row" style={{gap:12}}><h2 style={{margin:0}}>Аккаунты</h2><button onClick={auth.logout} style={{fontSize:11,padding:"2px 10px",color:"var(--text2)"}}>Выйти</button></div>
           <a href={getIgAuthUrl()} style={{textDecoration:"none"}}><button className="primary">+ Подключить Instagram</button></a>
         </div>
         {integrations?.length===0&&<div className="card empty">Нет подключённых аккаунтов</div>}
