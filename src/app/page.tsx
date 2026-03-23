@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/useSettings";
 
 const CONVEX_SITE_URL = "https://merry-puffin-860.eu-west-1.convex.site";
 const IG_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || "";
+const FB_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "";
 const ACCESS_CODE = process.env.NEXT_PUBLIC_ACCESS_CODE || "botmake2026";
 function getIgAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/callback`;
@@ -15,7 +16,7 @@ function getIgAuthUrl() {
 }
 function getFbAuthUrl() {
   const r = `${CONVEX_SITE_URL}/auth/fb-callback`;
-  return `https://www.facebook.com/v25.0/dialog/oauth?client_id=${IG_APP_ID}&redirect_uri=${encodeURIComponent(r)}&scope=pages_show_list,instagram_basic,instagram_manage_comments,instagram_manage_messages&response_type=code`;
+  return `https://www.facebook.com/v25.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(r)}&scope=pages_show_list,instagram_basic,instagram_manage_comments,instagram_manage_messages&response_type=code`;
 }
 
 type BtnForm={text:string;url:string};

@@ -53,8 +53,8 @@ export const exchangeAndSave = internalAction({
 export const exchangeAndSaveFb = internalAction({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
-    const appId = process.env.INSTAGRAM_APP_ID!;
-    const appSecret = process.env.INSTAGRAM_APP_SECRET!;
+    const appId = process.env.FACEBOOK_APP_ID!;
+    const appSecret = process.env.FACEBOOK_APP_SECRET!;
 
     // 1. Exchange code for Facebook user access token
     const tokenUrl = `https://graph.facebook.com/v25.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(FB_CALLBACK_URL)}&client_secret=${appSecret}&code=${code}`;
