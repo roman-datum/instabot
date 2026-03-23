@@ -74,7 +74,7 @@ export const exchangeAndSaveFb = internalAction({
     const pagesData = await pagesRes.json();
     console.log("FB Pages:", JSON.stringify(pagesData));
 
-    if (!pagesData.data?.length) throw new Error("No Facebook Pages found for this account");
+    if (!pagesData.data?.length) throw new Error("No Facebook Pages found. Make sure your Facebook account has Pages.");
 
     let connectedCount = 0;
     for (const page of pagesData.data) {
@@ -103,7 +103,7 @@ export const exchangeAndSaveFb = internalAction({
       connectedCount++;
     }
 
-    if (connectedCount === 0) throw new Error("No Instagram Business Accounts connected to your Facebook Pages");
+    if (connectedCount === 0) throw new Error("No Instagram Business Account linked to your Pages. Link Instagram to a Facebook Page first.");
     console.log(`Connected ${connectedCount} Instagram account(s) via Facebook`);
   },
 });

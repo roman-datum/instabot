@@ -1,10 +1,22 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { Lang } from "./i18n";
+import React from "react";
 
 type Theme = "dark" | "light";
 
-export function useSettings() {
+interface SettingsCtx {
+  lang: Lang;
+  theme: Theme;
+  toggleLang: () => void;
+  toggleTheme: () => void;
+}
+
+const Ctx = createContext<SettingsCtx>({
+  lang: "en", theme: "dark", toggleLang: () => {}, toggleTheme: () => {},
+});
+
+export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
   const [theme, setThemeState] = useState<Theme>("dark");
 
@@ -31,5 +43,9 @@ export function useSettings() {
   const toggleLang = useCallback(() => setLang(lang === "en" ? "ru" : "en"), [lang, setLang]);
   const toggleTheme = useCallback(() => setTheme(theme === "dark" ? "light" : "dark"), [theme, setTheme]);
 
-  return { lang, theme, toggleLang, toggleTheme };
+  return React.createElement(Ctx.Provider, { value: { lang, theme, toggleLang, toggleTheme } }, children);
+}
+
+export function useSettings() {
+  return useContext(Ctx);
 }

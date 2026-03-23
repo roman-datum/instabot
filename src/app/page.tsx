@@ -43,12 +43,14 @@ export default function Dashboard(){
   const [authMsg,setAuthMsg]=useState<string|null>(null);
   const [showConnect,setShowConnect]=useState(false);
 
+  const [authDetail,setAuthDetail]=useState<string|null>(null);
   useEffect(()=>{
     const p=new URLSearchParams(window.location.search);
     const a=p.get("auth");
+    const msg=p.get("msg");
     if(a==="success"){setAuthMsg("success");window.history.replaceState({},"","/");}
-    if(a==="error"){setAuthMsg("error");window.history.replaceState({},"","/");}
-    if(authMsg)setTimeout(()=>setAuthMsg(null),4000);
+    if(a==="error"){setAuthMsg("error");setAuthDetail(msg);window.history.replaceState({},"","/");}
+    if(authMsg)setTimeout(()=>{setAuthMsg(null);setAuthDetail(null);},6000);
   },[]);
 
   useEffect(()=>{
@@ -79,7 +81,7 @@ export default function Dashboard(){
   return(
     <div className="container">
       {authMsg==="success"&&<div className="toast toast-success">{t("auth.success", lang)}</div>}
-      {authMsg==="error"&&<div className="toast toast-error">{t("auth.error", lang)}</div>}
+      {authMsg==="error"&&<div className="toast toast-error">{t("auth.error", lang)}{authDetail&&<div style={{marginTop:4,fontSize:12,opacity:0.8}}>{authDetail}</div>}</div>}
 
       <div className="section">
         <div className="flex-between" style={{marginBottom:14}}>
