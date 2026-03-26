@@ -34,9 +34,11 @@ export const internalSaveIntegration = internalMutation({ args: integrationArgs,
 export const saveIntegration = mutation({ args: integrationArgs, handler: async (ctx, args) => doSaveIntegration(ctx, args) });
 
 const buttonValidator = v.optional(v.array(v.object({ text: v.string(), url: v.string() })));
+const carouselValidator = v.optional(v.array(v.object({ title: v.string(), subtitle: v.optional(v.string()), imageUrl: v.optional(v.string()), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) })));
 const actionSchema = v.object({
   type: v.union(v.literal("send_dm"), v.literal("reply_comment"), v.literal("both")),
-  message: v.string(), delaySeconds: v.number(), buttons: buttonValidator,
+  message: v.string(), delaySeconds: v.number(), buttons: buttonValidator, imageUrl: v.optional(v.string()),
+  videoUrl: v.optional(v.string()), audioUrl: v.optional(v.string()), fileUrl: v.optional(v.string()), carousel: carouselValidator,
   replyKeyword: v.optional(v.string()), quickReplies: v.optional(v.array(v.string())), commentReplies: v.optional(v.array(v.string())),
 });
 

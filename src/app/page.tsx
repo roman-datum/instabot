@@ -20,9 +20,11 @@ function getFbAuthUrl() {
 }
 
 type BtnForm={text:string;url:string};
-type ActionForm={type:"send_dm"|"reply_comment"|"both";message:string;delaySeconds:number;buttons:BtnForm[];replyKeyword:string;quickReplies:string[];commentReplies:string[]};
+type CarouselCardForm={title:string;subtitle:string;imageUrl:string;buttons:BtnForm[]};
+type ActionForm={type:"send_dm"|"reply_comment"|"both";message:string;delaySeconds:number;buttons:BtnForm[];replyKeyword:string;quickReplies:string[];commentReplies:string[];imageUrl:string;videoUrl:string;audioUrl:string;fileUrl:string;carousel:CarouselCardForm[]};
 type TriggerForm={type:"dm"|"comment";matchType:"contains"|"exact"|"starts_with"|"any";keywords:string;postFilter:"all"|"selected";selectedPostIds:string};
-const emptyAction=():ActionForm=>({type:"send_dm",message:"",delaySeconds:0,buttons:[],replyKeyword:"",quickReplies:[],commentReplies:[]});
+const emptyAction=():ActionForm=>({type:"send_dm",message:"",delaySeconds:0,buttons:[],replyKeyword:"",quickReplies:[],commentReplies:[],imageUrl:"",videoUrl:"",audioUrl:"",fileUrl:"",carousel:[]});
+const emptyCard=():CarouselCardForm=>({title:"",subtitle:"",imageUrl:"",buttons:[]});
 const emptyTrigger=():TriggerForm=>({type:"comment",matchType:"contains",keywords:"",postFilter:"all",selectedPostIds:""});
 
 function useAuth() {
@@ -203,6 +205,20 @@ function AutomationCard({automation,lang}:{automation:any;lang:"en"|"ru"}){
             {action.replyKeyword&&<span style={{fontSize:11,color:"var(--accent2)"}}>{t("waits",lang)} {action.replyKeyword}</span>}
           </div>
           <div className="msg-preview">{action.message}</div>
+          {(action.imageUrl||action.videoUrl||action.audioUrl||action.fileUrl)&&(
+            <div className="extras">
+              {action.imageUrl&&<span className="kw-tag">🖼 {lang==="ru"?"Картинка":"Image"}</span>}
+              {action.videoUrl&&<span className="kw-tag">🎬 {lang==="ru"?"Видео":"Video"}</span>}
+              {action.audioUrl&&<span className="kw-tag">🎵 {lang==="ru"?"Аудио":"Audio"}</span>}
+              {action.fileUrl&&<span className="kw-tag">📄 {lang==="ru"?"Файл":"File"}</span>}
+            </div>
+          )}
+          {action.carousel?.length>0&&(
+            <div className="extras">
+              <span className="kw-tag">🎠 {lang==="ru"?"Карусель":"Carousel"}: {action.carousel.length} {lang==="ru"?"карт.":"cards"}</span>
+              {action.carousel.map((c:any,ci:number)=><span key={ci} className="kw-tag" style={{color:"var(--text2)"}}>{c.title}</span>)}
+            </div>
+          )}
           {(action.quickReplies?.length>0||action.buttons?.length>0||action.commentReplies?.length>0)&&(
             <div className="extras">
               {action.quickReplies?.map((qr:string,qi:number)=><span key={qi} className="kw-tag">&#9889; {qr}</span>)}
@@ -223,13 +239,13 @@ function AutomationForm({mode,automation,integrationId,onClose,lang}:{mode:"crea
   const et=automation?.triggers?.[0];const ea=automation?.actions?[...automation.actions].sort((a:any,b:any)=>(a.step??0)-(b.step??0)):null;
   const [name,setName]=useState(automation?.name||"");
   const [trigger,setTrigger]=useState<TriggerForm>(et?{type:et.type,matchType:et.matchType,keywords:et.keywords?.join(", ")||"",postFilter:et.postFilter||"all",selectedPostIds:et.selectedPostIds?.join(", ")||""}:emptyTrigger());
-  const [actions,setActions]=useState<ActionForm[]>(ea?ea.map((a:any)=>({type:a.type,message:a.message,delaySeconds:a.delaySeconds,buttons:a.buttons||[],replyKeyword:a.replyKeyword||"",quickReplies:a.quickReplies||[],commentReplies:a.commentReplies||[]})):[emptyAction()]);
+  const [actions,setActions]=useState<ActionForm[]>(ea?ea.map((a:any)=>({type:a.type,message:a.message,delaySeconds:a.delaySeconds,buttons:a.buttons||[],replyKeyword:a.replyKeyword||"",quickReplies:a.quickReplies||[],commentReplies:a.commentReplies||[],imageUrl:a.imageUrl||"",videoUrl:a.videoUrl||"",audioUrl:a.audioUrl||"",fileUrl:a.fileUrl||"",carousel:(a.carousel||[]).map((c:any)=>({title:c.title||"",subtitle:c.subtitle||"",imageUrl:c.imageUrl||"",buttons:c.buttons||[]}))})):[emptyAction()]);
   const upd=(i:number,p:Partial<ActionForm>)=>setActions(prev=>prev.map((a,idx)=>idx===i?{...a,...p}:a));
   const reset=()=>{setName("");setTrigger(emptyTrigger());setActions([emptyAction()]);setOpen(false);onClose?.();};
   const save=async()=>{
     if(!name||!actions[0]?.message)return;
     const td={type:trigger.type,matchType:trigger.matchType,keywords:trigger.matchType==="any"?[]:trigger.keywords.split(",").map(k=>k.trim()).filter(Boolean),postFilter:trigger.postFilter,selectedPostIds:trigger.postFilter==="selected"?trigger.selectedPostIds.split(",").map(k=>k.trim()).filter(Boolean):[]};
-    const ad=actions.map((a,i)=>({type:a.type,message:a.message,delaySeconds:a.delaySeconds,buttons:a.buttons.filter(b=>b.text&&b.url).length>0?a.buttons.filter(b=>b.text&&b.url):undefined,replyKeyword:i===0&&actions.length>1&&a.replyKeyword?a.replyKeyword:undefined,quickReplies:a.quickReplies.filter(Boolean).length>0?a.quickReplies.filter(Boolean):undefined,commentReplies:a.commentReplies.filter(Boolean).length>0?a.commentReplies.filter(Boolean):undefined}));
+    const ad=actions.map((a,i)=>({type:a.type,message:a.message,delaySeconds:a.delaySeconds,buttons:a.buttons.filter(b=>b.text&&b.url).length>0?a.buttons.filter(b=>b.text&&b.url):undefined,replyKeyword:i===0&&actions.length>1&&a.replyKeyword?a.replyKeyword:undefined,quickReplies:a.quickReplies.filter(Boolean).length>0?a.quickReplies.filter(Boolean):undefined,commentReplies:a.commentReplies.filter(Boolean).length>0?a.commentReplies.filter(Boolean):undefined,imageUrl:a.imageUrl||undefined,videoUrl:a.videoUrl||undefined,audioUrl:a.audioUrl||undefined,fileUrl:a.fileUrl||undefined,carousel:a.carousel.filter(c=>c.title).length>0?a.carousel.filter(c=>c.title).map(c=>({title:c.title,subtitle:c.subtitle||undefined,imageUrl:c.imageUrl||undefined,buttons:c.buttons.filter(b=>b.text&&b.url).length>0?c.buttons.filter(b=>b.text&&b.url):undefined})):undefined}));
     if(mode==="edit"&&automation){await edit({id:automation._id,name,trigger:td,actions:ad});onClose?.();}
     else{await create({name,integrationId,trigger:td,actions:ad});reset();}
   };
@@ -277,6 +293,38 @@ function AutomationForm({mode,automation,integrationId,onClose,lang}:{mode:"crea
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button></div>))}
             <button className="ghost" onClick={()=>upd(idx,{buttons:[...action.buttons,{text:"",url:""}]})}>{t("form.add",lang)}</button>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label>{lang==="ru"?"Медиа":"Media"}</label>
+            <div className="row" style={{marginBottom:4}}><input placeholder={lang==="ru"?"URL картинки":"Image URL"} value={action.imageUrl} onChange={e=>upd(idx,{imageUrl:e.target.value})}/></div>
+            <div className="row" style={{marginBottom:4}}><input placeholder={lang==="ru"?"URL видео (до 5 МБ)":"Video URL (max 5 MB)"} value={action.videoUrl} onChange={e=>upd(idx,{videoUrl:e.target.value})}/></div>
+          </div>
+          <div>
+            <label>{lang==="ru"?"Карусель":"Carousel"}</label>
+            {action.carousel.map((card,ci)=>(
+              <div key={ci} style={{border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:8}}>
+                <div className="flex-between" style={{marginBottom:6}}>
+                  <span style={{fontSize:11,fontWeight:600,color:"var(--text2)"}}>{lang==="ru"?"Карточка":"Card"} {ci+1}</span>
+                  <button className="ghost" onClick={()=>upd(idx,{carousel:action.carousel.filter((_,j)=>j!==ci)})}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <input placeholder={lang==="ru"?"Заголовок (макс 80)":"Title (max 80)"} value={card.title} onChange={e=>{const n=[...action.carousel];n[ci]={...n[ci],title:e.target.value};upd(idx,{carousel:n});}} style={{marginBottom:4}}/>
+                <input placeholder={lang==="ru"?"Подзаголовок":"Subtitle"} value={card.subtitle} onChange={e=>{const n=[...action.carousel];n[ci]={...n[ci],subtitle:e.target.value};upd(idx,{carousel:n});}} style={{marginBottom:4}}/>
+                <input placeholder={lang==="ru"?"URL картинки":"Image URL"} value={card.imageUrl} onChange={e=>{const n=[...action.carousel];n[ci]={...n[ci],imageUrl:e.target.value};upd(idx,{carousel:n});}} style={{marginBottom:4}}/>
+                {card.buttons.map((btn,bi)=>(
+                  <div className="row" key={bi} style={{marginBottom:4}}>
+                    <input placeholder={lang==="ru"?"Текст кнопки":"Button text"} value={btn.text} onChange={e=>{const n=[...action.carousel];const btns=[...n[ci].buttons];btns[bi]={...btns[bi],text:e.target.value};n[ci]={...n[ci],buttons:btns};upd(idx,{carousel:n});}}/>
+                    <input placeholder="https://..." value={btn.url} onChange={e=>{const n=[...action.carousel];const btns=[...n[ci].buttons];btns[bi]={...btns[bi],url:e.target.value};n[ci]={...n[ci],buttons:btns};upd(idx,{carousel:n});}}/>
+                    <button className="ghost" onClick={()=>{const n=[...action.carousel];n[ci]={...n[ci],buttons:n[ci].buttons.filter((_,j)=>j!==bi)};upd(idx,{carousel:n});}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                ))}
+                <button className="ghost" onClick={()=>{const n=[...action.carousel];n[ci]={...n[ci],buttons:[...n[ci].buttons,{text:"",url:""}]};upd(idx,{carousel:n});}}>{lang==="ru"?"+ Кнопка":"+ Button"}</button>
+              </div>
+            ))}
+            {action.carousel.length<10&&<button className="ghost" onClick={()=>upd(idx,{carousel:[...action.carousel,emptyCard()]})}>{lang==="ru"?"+ Карточка":"+ Card"}</button>}
           </div>
         </div>
       ))}

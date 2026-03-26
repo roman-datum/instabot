@@ -21,7 +21,7 @@ export const handleDm = internalAction({
       let cd = 0;
       for (const action of followups) {
         cd += (action.delaySeconds || 0);
-        const args = { token: integ.pageAccessToken, igUserId: integ.instagramId, recipientId: senderId, text: action.message, logAutomationId: matchedAutoId, clientInstagramId: senderId, quickReplies: action.quickReplies || undefined, buttons: action.buttons || undefined };
+        const args = { token: integ.pageAccessToken, igUserId: integ.instagramId, recipientId: senderId, text: action.message, logAutomationId: matchedAutoId, clientInstagramId: senderId, quickReplies: action.quickReplies || undefined, buttons: action.buttons || undefined, imageUrl: action.imageUrl || undefined, videoUrl: action.videoUrl || undefined, audioUrl: action.audioUrl || undefined, fileUrl: action.fileUrl || undefined, carousel: action.carousel || undefined };
         if (cd > 0) await ctx.scheduler.runAfter(cd * 1000, internal.instagram.sendDm, args);
         else await ctx.runAction(internal.instagram.sendDm, args);
       }
@@ -38,7 +38,7 @@ export const handleDm = internalAction({
       for (const action of sorted) {
         cd += (action.delaySeconds || 0);
         if (action.type === "send_dm" || action.type === "both") {
-          const args = { token: integ.pageAccessToken, igUserId: integ.instagramId, recipientId: senderId, text: action.message, logAutomationId: match.automationId, clientInstagramId: senderId, quickReplies: action.quickReplies || undefined, buttons: action.buttons || undefined };
+          const args = { token: integ.pageAccessToken, igUserId: integ.instagramId, recipientId: senderId, text: action.message, logAutomationId: match.automationId, clientInstagramId: senderId, quickReplies: action.quickReplies || undefined, buttons: action.buttons || undefined, imageUrl: action.imageUrl || undefined, videoUrl: action.videoUrl || undefined, audioUrl: action.audioUrl || undefined, fileUrl: action.fileUrl || undefined, carousel: action.carousel || undefined };
           if (cd > 0) await ctx.scheduler.runAfter(cd * 1000, internal.instagram.sendDm, args);
           else await ctx.runAction(internal.instagram.sendDm, args);
         }
