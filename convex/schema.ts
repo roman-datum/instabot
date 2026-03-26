@@ -6,7 +6,7 @@ export default defineSchema({
     accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(),
     instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()),
     connectedAt: v.number(), expiresAt: v.optional(v.number()),
-  }).index("by_ig_id", ["instagramId"]).index("by_igba", ["igBusinessId"]),
+  }).index("by_ig_id", ["instagramId"]).index("by_igba", ["igBusinessId"]).index("by_page_id", ["pageId"]),
 
   automations: defineTable({
     name: v.string(), isActive: v.boolean(), createdAt: v.number(),

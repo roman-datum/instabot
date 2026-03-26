@@ -3,7 +3,15 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-const GRAPH_URL = "https://graph.instagram.com/v25.0";
+// IGQ tokens (IG Login) → graph.instagram.com; EAA tokens (FB Login) → graph.facebook.com
+function graphUrl(token: string) {
+  return token.startsWith("EAA") ? "https://graph.facebook.com/v25.0" : "https://graph.instagram.com/v25.0";
+}
+// EAA tokens must use /me/messages (not /{igUserId}/messages)
+function msgEndpoint(token: string, igUserId?: string) {
+  if (token.startsWith("EAA")) return `${graphUrl(token)}/me/messages`;
+  return igUserId ? `${graphUrl(token)}/${igUserId}/messages` : `${graphUrl(token)}/me/messages`;
+}
 
 export const sendDm = internalAction({
   args: { token: v.string(), igUserId: v.optional(v.string()), recipientId: v.string(), text: v.string(), logAutomationId: v.id("automations"), clientInstagramId: v.string(), quickReplies: v.optional(v.array(v.string())), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) },
@@ -13,8 +21,7 @@ export const sendDm = internalAction({
       if (buttons?.length) for (const btn of buttons) msgText += `\n\n${btn.text}: ${btn.url}`;
       const msgPayload: any = { text: msgText };
       if (quickReplies?.length) msgPayload.quick_replies = quickReplies.map(qr => ({ content_type: "text", title: qr, payload: qr }));
-      const endpoint = igUserId ? `${GRAPH_URL}/${igUserId}/messages` : `${GRAPH_URL}/me/messages`;
-      const res = await fetch(endpoint, {
+      const res = await fetch(msgEndpoint(token, igUserId), {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ recipient: { id: recipientId }, message: msgPayload }),
       });
@@ -32,8 +39,7 @@ export const sendPrivateReply = internalAction({
       if (buttons?.length) for (const btn of buttons) msgText += `\n\n${btn.text}: ${btn.url}`;
       const msgPayload: any = { text: msgText };
       if (quickReplies?.length) msgPayload.quick_replies = quickReplies.map(qr => ({ content_type: "text", title: qr, payload: qr }));
-      const endpoint = igUserId ? `${GRAPH_URL}/${igUserId}/messages` : `${GRAPH_URL}/me/messages`;
-      const res = await fetch(endpoint, {
+      const res = await fetch(msgEndpoint(token, igUserId), {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ recipient: { comment_id: commentId }, message: msgPayload }),
       });
@@ -48,7 +54,7 @@ export const replyComment = internalAction({
   handler: async (ctx, { token, commentId, text, logAutomationId, clientInstagramId }) => {
     try {
       // Use Authorization header, not URL param
-      const res = await fetch(`${GRAPH_URL}/${commentId}/replies`, {
+      const res = await fetch(`${graphUrl(token)}/${commentId}/replies`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ message: text }),

@@ -4,10 +4,12 @@ import { query, internalQuery } from "./_generated/server";
 export const getIntegrationByInstagramId = internalQuery({
   args: { instagramId: v.string() },
   handler: async (ctx, { instagramId }) => {
-    // Try app-scoped ID first, then IGBA ID (webhook entry.id format)
+    // Try app-scoped ID first, then IGBA ID, then Page ID (FB Login webhook entry.id may be pageId)
     const byAppId = await ctx.db.query("integrations").withIndex("by_ig_id", (q) => q.eq("instagramId", instagramId)).first();
     if (byAppId) return byAppId;
-    return await ctx.db.query("integrations").withIndex("by_igba", (q) => q.eq("igBusinessId", instagramId)).first();
+    const byIgba = await ctx.db.query("integrations").withIndex("by_igba", (q) => q.eq("igBusinessId", instagramId)).first();
+    if (byIgba) return byIgba;
+    return await ctx.db.query("integrations").withIndex("by_page_id", (q) => q.eq("pageId", instagramId)).first();
   },
 });
 
