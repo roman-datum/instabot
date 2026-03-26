@@ -15,7 +15,7 @@ export const addLog = internalMutation({
   handler: async (ctx, args) => { await ctx.db.insert("logs", { ...args, timestamp: Date.now() }); },
 });
 
-const integrationArgs = { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()) };
+const integrationArgs = { accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(), instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()), expiresAt: v.optional(v.number()), workspaceId: v.optional(v.id("workspaces")) };
 
 async function doSaveIntegration(ctx: any, args: any) {
   // Upsert: check instagramId first, then igBusinessId (handles IG Login → FB Login reconnect)
@@ -32,6 +32,46 @@ async function doSaveIntegration(ctx: any, args: any) {
 
 export const internalSaveIntegration = internalMutation({ args: integrationArgs, handler: async (ctx, args) => doSaveIntegration(ctx, args) });
 export const saveIntegration = mutation({ args: integrationArgs, handler: async (ctx, args) => doSaveIntegration(ctx, args) });
+
+export const addWorkspace = mutation({
+  args: { name: v.string(), password: v.string(), maxAccounts: v.optional(v.number()) },
+  handler: async (ctx, { name, password, maxAccounts }) => {
+    const existing = await ctx.db.query("workspaces").withIndex("by_password", (q) => q.eq("password", password)).first();
+    if (existing) throw new Error("Workspace with this password already exists");
+    return await ctx.db.insert("workspaces", { name, password, maxAccounts, createdAt: Date.now() });
+  },
+});
+
+export const removeWorkspace = mutation({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const integrations = await ctx.db.query("integrations").withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId)).collect();
+    for (const integ of integrations) {
+      const autos = await ctx.db.query("automations").withIndex("by_integration", (q) => q.eq("integrationId", integ._id)).collect();
+      for (const a of autos) {
+        for (const t of await ctx.db.query("triggers").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(t._id);
+        for (const ac of await ctx.db.query("actions").withIndex("by_automation", (q) => q.eq("automationId", a._id)).collect()) await ctx.db.delete(ac._id);
+        await ctx.db.delete(a._id);
+      }
+      await ctx.db.delete(integ._id);
+    }
+    await ctx.db.delete(workspaceId);
+  },
+});
+
+export const seedDefaultWorkspace = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db.query("workspaces").withIndex("by_password", (q) => q.eq("password", "botmake2026")).first();
+    if (existing) return existing._id;
+    const wsId = await ctx.db.insert("workspaces", { name: "Default", password: "botmake2026", createdAt: Date.now() });
+    const integrations = await ctx.db.query("integrations").collect();
+    for (const integ of integrations) {
+      if (!integ.workspaceId) await ctx.db.patch(integ._id, { workspaceId: wsId });
+    }
+    return wsId;
+  },
+});
 
 const buttonValidator = v.optional(v.array(v.object({ text: v.string(), url: v.string() })));
 const carouselValidator = v.optional(v.array(v.object({ title: v.string(), subtitle: v.optional(v.string()), imageUrl: v.optional(v.string()), buttons: v.optional(v.array(v.object({ text: v.string(), url: v.string() }))) })));

@@ -8,17 +8,19 @@ const FRONTEND = "https://direct.botmake.site";
 
 http.route({ path: "/auth/callback", method: "GET", handler: httpAction(async (ctx, request) => {
   const url = new URL(request.url); const code = url.searchParams.get("code"); const error = url.searchParams.get("error");
+  const workspaceId = url.searchParams.get("state") || undefined;
   const frontendUrl = process.env.FRONTEND_URL || FRONTEND;
   if (error || !code) return Response.redirect(`${frontendUrl}?auth=error`, 302);
-  try { await ctx.runAction(internal.auth.exchangeAndSave, { code: code.replace(/#_$/, "") }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
+  try { await ctx.runAction(internal.auth.exchangeAndSave, { code: code.replace(/#_$/, ""), workspaceId }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
   catch (e: any) { console.error("OAuth error:", e.message); return Response.redirect(`${frontendUrl}?auth=error`, 302); }
 })});
 
 http.route({ path: "/auth/fb-callback", method: "GET", handler: httpAction(async (ctx, request) => {
   const url = new URL(request.url); const code = url.searchParams.get("code"); const error = url.searchParams.get("error");
+  const workspaceId = url.searchParams.get("state") || undefined;
   const frontendUrl = process.env.FRONTEND_URL || FRONTEND;
   if (error || !code) return Response.redirect(`${frontendUrl}?auth=error&msg=${encodeURIComponent(error || "no_code")}`, 302);
-  try { await ctx.runAction(internal.auth.exchangeAndSaveFb, { code }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
+  try { await ctx.runAction(internal.auth.exchangeAndSaveFb, { code, workspaceId }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
   catch (e: any) { console.error("FB OAuth error:", e.message); return Response.redirect(`${frontendUrl}?auth=error&msg=${encodeURIComponent(e.message || "unknown")}`, 302); }
 })});
 

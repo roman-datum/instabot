@@ -7,8 +7,8 @@ const CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/callba
 const FB_CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/fb-callback";
 
 export const exchangeAndSave = internalAction({
-  args: { code: v.string() },
-  handler: async (ctx, { code }) => {
+  args: { code: v.string(), workspaceId: v.optional(v.string()) },
+  handler: async (ctx, { code, workspaceId }) => {
     const appId = process.env.INSTAGRAM_APP_ID!;
     const appSecret = process.env.INSTAGRAM_APP_SECRET!;
 
@@ -46,13 +46,14 @@ export const exchangeAndSave = internalAction({
       igBusinessId: igBusinessId || "",
       pageName: profile.username || profile.name || appScopedId,
       expiresAt: Date.now() + expiresIn * 1000,
+      workspaceId: workspaceId as any || undefined,
     });
   },
 });
 
 export const exchangeAndSaveFb = internalAction({
-  args: { code: v.string() },
-  handler: async (ctx, { code }) => {
+  args: { code: v.string(), workspaceId: v.optional(v.string()) },
+  handler: async (ctx, { code, workspaceId }) => {
     const appId = process.env.FACEBOOK_APP_ID!;
     const appSecret = process.env.FACEBOOK_APP_SECRET!;
 
@@ -100,6 +101,7 @@ export const exchangeAndSaveFb = internalAction({
         igBusinessId: igId,
         pageName: igUsername,
         expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // ~60 days
+        workspaceId: workspaceId as any || undefined,
       });
       connectedCount++;
     }

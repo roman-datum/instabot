@@ -2,11 +2,19 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  workspaces: defineTable({
+    name: v.string(),
+    password: v.string(),
+    maxAccounts: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_password", ["password"]),
+
   integrations: defineTable({
     accessToken: v.string(), pageAccessToken: v.string(), pageId: v.string(),
     instagramId: v.string(), igBusinessId: v.optional(v.string()), pageName: v.optional(v.string()),
     connectedAt: v.number(), expiresAt: v.optional(v.number()),
-  }).index("by_ig_id", ["instagramId"]).index("by_igba", ["igBusinessId"]).index("by_page_id", ["pageId"]),
+    workspaceId: v.optional(v.id("workspaces")),
+  }).index("by_ig_id", ["instagramId"]).index("by_igba", ["igBusinessId"]).index("by_page_id", ["pageId"]).index("by_workspace", ["workspaceId"]),
 
   automations: defineTable({
     name: v.string(), isActive: v.boolean(), createdAt: v.number(),

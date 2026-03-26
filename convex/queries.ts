@@ -56,6 +56,28 @@ export const checkRecentLog = internalQuery({
 export const listIntegrations = query({ args: {}, handler: async (ctx) => await ctx.db.query("integrations").collect() });
 export const getIntegration = query({ args: {}, handler: async (ctx) => { const all = await ctx.db.query("integrations").collect(); return all[0] ?? null; }});
 
+export const getWorkspaceByPassword = query({
+  args: { password: v.string() },
+  handler: async (ctx, { password }) => {
+    const ws = await ctx.db.query("workspaces").withIndex("by_password", (q) => q.eq("password", password)).first();
+    if (!ws) return null;
+    return { _id: ws._id, name: ws.name, maxAccounts: ws.maxAccounts };
+  },
+});
+
+export const listIntegrationsByWorkspace = query({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => await ctx.db.query("integrations").withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId)).collect(),
+});
+
+export const countIntegrationsByWorkspace = internalQuery({
+  args: { workspaceId: v.id("workspaces") },
+  handler: async (ctx, { workspaceId }) => {
+    const all = await ctx.db.query("integrations").withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId)).collect();
+    return all.length;
+  },
+});
+
 export const listAutomationsByIntegration = query({
   args: { integrationId: v.id("integrations") },
   handler: async (ctx, { integrationId }) => {
