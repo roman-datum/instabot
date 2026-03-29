@@ -20,7 +20,11 @@ http.route({ path: "/auth/fb-callback", method: "GET", handler: httpAction(async
   const workspaceId = url.searchParams.get("state") || undefined;
   const frontendUrl = process.env.FRONTEND_URL || FRONTEND;
   if (error || !code) return Response.redirect(`${frontendUrl}?auth=error&msg=${encodeURIComponent(error || "no_code")}`, 302);
-  try { await ctx.runAction(internal.auth.exchangeAndSaveFb, { code, workspaceId }); return Response.redirect(`${frontendUrl}?auth=success`, 302); }
+  try {
+    const result: any = await ctx.runAction(internal.auth.exchangeAndSaveFb, { code, workspaceId });
+    if (result?.type === "select") return Response.redirect(`${frontendUrl}?fb_select=${result.sessionId}`, 302);
+    return Response.redirect(`${frontendUrl}?auth=success`, 302);
+  }
   catch (e: any) { console.error("FB OAuth error:", e.message); return Response.redirect(`${frontendUrl}?auth=error&msg=${encodeURIComponent(e.message || "unknown")}`, 302); }
 })});
 

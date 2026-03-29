@@ -1,6 +1,6 @@
 "use node";
 import { v } from "convex/values";
-import { internalAction } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 const CALLBACK_URL = "https://merry-puffin-860.eu-west-1.convex.site/auth/callback";
@@ -51,62 +51,116 @@ export const exchangeAndSave = internalAction({
   },
 });
 
+// Step 1: Exchange FB code → save session with available pages (don't connect yet)
 export const exchangeAndSaveFb = internalAction({
   args: { code: v.string(), workspaceId: v.optional(v.string()) },
-  handler: async (ctx, { code, workspaceId }) => {
+  handler: async (ctx, { code, workspaceId }): Promise<{ type: "connected"; count: number } | { type: "select"; sessionId: string }> => {
     const appId = process.env.FACEBOOK_APP_ID!;
     const appSecret = process.env.FACEBOOK_APP_SECRET!;
 
-    // 1. Exchange code for Facebook user access token
     const tokenUrl = `https://graph.facebook.com/v25.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(FB_CALLBACK_URL)}&client_secret=${appSecret}&code=${code}`;
     const tokenRes = await fetch(tokenUrl);
     const tokenData = await tokenRes.json();
-    console.log("FB token exchange:", JSON.stringify(tokenData));
     if (!tokenData.access_token) throw new Error(`FB token exchange failed: ${JSON.stringify(tokenData)}`);
 
-    // 2. Exchange for long-lived user token
     const longRes = await fetch(`https://graph.facebook.com/v25.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${tokenData.access_token}`);
     const longData = await longRes.json();
     const longUserToken = longData.access_token || tokenData.access_token;
-    console.log("FB long-lived token obtained:", !!longUserToken);
 
-    // 3. Get user's Facebook Pages with connected Instagram Business Accounts
-    const pagesRes = await fetch(`https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${longUserToken}`);
-    const pagesData = await pagesRes.json();
-    console.log("FB Pages:", JSON.stringify(pagesData));
+    // Get ALL pages with pagination
+    let allPages: any[] = [];
+    let pagesUrl: string | null = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&limit=100&access_token=${longUserToken}`;
+    while (pagesUrl) {
+      const pagesRes: Response = await fetch(pagesUrl);
+      const pagesData: any = await pagesRes.json();
+      if (pagesData.data?.length) allPages.push(...pagesData.data);
+      pagesUrl = pagesData.paging?.next || null;
+    }
 
-    if (!pagesData.data?.length) throw new Error("No Facebook Pages found. Make sure your Facebook account has Pages.");
+    // Filter pages with Instagram accounts
+    const igPages = allPages.filter((p: any) => p.instagram_business_account).map((p: any) => ({
+      pageId: String(p.id),
+      pageName: String(p.name || p.id),
+      pageToken: String(p.access_token),
+      igId: String(p.instagram_business_account.id),
+      igUsername: String(p.instagram_business_account.username || p.instagram_business_account.name || p.instagram_business_account.id),
+    }));
+
+    await ctx.runMutation(internal.mutations.addLog, {
+      clientInstagramId: "auth", eventType: "fb_auth_pages",
+      message: `Found ${allPages.length} pages, ${igPages.length} with IG: ${igPages.map(p => `@${p.igUsername}`).join(", ").slice(0, 150)}`,
+    });
+
+    if (igPages.length === 0) {
+      const pageNames = allPages.map((p: any) => p.name).join(", ");
+      throw new Error(`No Instagram Business Account linked to your Pages (${pageNames}). Link Instagram to a Facebook Page first.`);
+    }
+
+    // If only 1 page with IG — connect directly (no need for selector)
+    if (igPages.length === 1) {
+      const p = igPages[0];
+      const subRes = await fetch(`https://graph.facebook.com/v25.0/${p.pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,feed&access_token=${p.pageToken}`, { method: "POST" });
+      const subData = await subRes.json();
+      console.log(`Webhook sub for ${p.igUsername}:`, JSON.stringify(subData));
+      await ctx.runMutation(internal.mutations.internalSaveIntegration, {
+        accessToken: p.pageToken, pageAccessToken: p.pageToken,
+        pageId: p.pageId, instagramId: p.igId, igBusinessId: p.igId,
+        pageName: p.igUsername, expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000,
+        workspaceId: workspaceId as any || undefined,
+      });
+      return { type: "connected" as const, count: 1 };
+    }
+
+    // Multiple pages — save session for frontend picker
+    const sessionId = await ctx.runMutation(internal.mutations.saveFbAuthSession, {
+      userToken: longUserToken, pages: igPages,
+      workspaceId: workspaceId as any || undefined,
+    });
+    return { type: "select" as const, sessionId };
+  },
+});
+
+// Step 2: Connect selected pages from the session
+export const connectSelectedFbPages = internalAction({
+  args: { sessionId: v.id("fbAuthSessions"), selectedIgIds: v.array(v.string()) },
+  handler: async (ctx, { sessionId, selectedIgIds }) => {
+    const session = await ctx.runQuery(internal.queries.getFbAuthSession, { sessionId });
+    if (!session || session.expiresAt < Date.now()) throw new Error("Session expired. Please reconnect via Facebook.");
 
     let connectedCount = 0;
-    for (const page of pagesData.data) {
-      const igAccount = page.instagram_business_account;
-      if (!igAccount) continue;
+    for (const page of session.pages) {
+      if (!selectedIgIds.includes(page.igId)) continue;
 
-      const pageToken = page.access_token; // Page tokens from long-lived user tokens are already long-lived
-      const igId = String(igAccount.id);
-      const igUsername = igAccount.username || igAccount.name || igId;
-
-      // 4. Subscribe Facebook Page to webhooks (EAA tokens work on graph.facebook.com, NOT graph.instagram.com)
-      // Reference: datum-chatbot-backend uses graph.facebook.com/{page_id}/subscribed_apps
-      const subRes = await fetch(`https://graph.facebook.com/v25.0/${page.id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,feed&access_token=${pageToken}`, { method: "POST" });
+      const subRes = await fetch(`https://graph.facebook.com/v25.0/${page.pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,feed&access_token=${page.pageToken}`, { method: "POST" });
       const subData = await subRes.json();
-      console.log(`Webhook sub for ${igUsername} (page:${page.id}):`, JSON.stringify(subData));
+      console.log(`Webhook sub for ${page.igUsername}:`, JSON.stringify(subData));
 
-      // 5. Save integration — igBusinessId = instagramId for FB Login flow
       await ctx.runMutation(internal.mutations.internalSaveIntegration, {
-        accessToken: pageToken,
-        pageAccessToken: pageToken,
-        pageId: String(page.id),
-        instagramId: igId,
-        igBusinessId: igId,
-        pageName: igUsername,
-        expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // ~60 days
-        workspaceId: workspaceId as any || undefined,
+        accessToken: page.pageToken, pageAccessToken: page.pageToken,
+        pageId: page.pageId, instagramId: page.igId, igBusinessId: page.igId,
+        pageName: page.igUsername, expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000,
+        workspaceId: session.workspaceId || undefined,
       });
       connectedCount++;
     }
 
-    if (connectedCount === 0) throw new Error("No Instagram Business Account linked to your Pages. Link Instagram to a Facebook Page first.");
-    console.log(`Connected ${connectedCount} Instagram account(s) via Facebook`);
+    // Clean up session
+    await ctx.runMutation(internal.mutations.deleteFbAuthSession, { sessionId });
+
+    await ctx.runMutation(internal.mutations.addLog, {
+      clientInstagramId: "auth", eventType: "fb_auth_result",
+      message: `Connected ${connectedCount} selected pages`,
+    });
+
+    if (connectedCount === 0) throw new Error("No pages selected");
+    return connectedCount;
+  },
+});
+
+// Public action: called from frontend to connect selected pages
+export const connectFbPages = action({
+  args: { sessionId: v.id("fbAuthSessions"), selectedIgIds: v.array(v.string()) },
+  handler: async (ctx, args): Promise<number> => {
+    return await ctx.runAction(internal.auth.connectSelectedFbPages, args) as number;
   },
 });

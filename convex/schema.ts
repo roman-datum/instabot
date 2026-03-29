@@ -55,6 +55,13 @@ export default defineSchema({
     username: v.optional(v.string()), profilePic: v.optional(v.string()), firstSeen: v.number(),
   }).index("by_instagram_id", ["instagramId"]),
 
+  fbAuthSessions: defineTable({
+    userToken: v.string(),
+    pages: v.array(v.object({ pageId: v.string(), pageName: v.string(), pageToken: v.string(), igId: v.string(), igUsername: v.string() })),
+    workspaceId: v.optional(v.id("workspaces")),
+    expiresAt: v.number(),
+  }),
+
   logs: defineTable({
     automationId: v.optional(v.id("automations")), triggerId: v.optional(v.id("triggers")),
     clientInstagramId: v.string(), eventType: v.string(), message: v.string(), timestamp: v.number(),

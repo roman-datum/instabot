@@ -1,5 +1,5 @@
 "use client";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -89,12 +89,15 @@ export default function Dashboard(){
   const [showConnect,setShowConnect]=useState(false);
 
   const [authDetail,setAuthDetail]=useState<string|null>(null);
+  const [fbSelectSession,setFbSelectSession]=useState<Id<"fbAuthSessions">|null>(null);
   useEffect(()=>{
     const p=new URLSearchParams(window.location.search);
     const a=p.get("auth");
     const msg=p.get("msg");
+    const fbSel=p.get("fb_select");
     if(a==="success"){setAuthMsg("success");window.history.replaceState({},"","/");}
     if(a==="error"){setAuthMsg("error");setAuthDetail(msg);window.history.replaceState({},"","/");}
+    if(fbSel){setFbSelectSession(fbSel as Id<"fbAuthSessions">);window.history.replaceState({},"","/");}
     if(authMsg)setTimeout(()=>{setAuthMsg(null);setAuthDetail(null);},6000);
   },[]);
 
@@ -127,6 +130,7 @@ export default function Dashboard(){
     <div className="container">
       {authMsg==="success"&&<div className="toast toast-success">{t("auth.success", lang)}</div>}
       {authMsg==="error"&&<div className="toast toast-error">{t("auth.error", lang)}{authDetail&&<div style={{marginTop:4,fontSize:12,opacity:0.8}}>{authDetail}</div>}</div>}
+      {fbSelectSession&&<FbPageSelector sessionId={fbSelectSession} lang={lang} onDone={()=>{setFbSelectSession(null);setAuthMsg("success");}} onCancel={()=>setFbSelectSession(null)}/>}
 
       <div className="section">
         <div className="flex-between" style={{marginBottom:14}}>
@@ -184,6 +188,57 @@ export default function Dashboard(){
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FbPageSelector({sessionId,lang,onDone,onCancel}:{sessionId:Id<"fbAuthSessions">;lang:"en"|"ru";onDone:()=>void;onCancel:()=>void}){
+  const session=useQuery(api.queries.getFbAuthSessionPublic,{sessionId});
+  const connectPages=useAction(api.auth.connectFbPages);
+  const [selected,setSelected]=useState<Set<string>>(new Set());
+  const [loading,setLoading]=useState(false);
+
+  if(session===undefined) return <div className="modal-overlay"><div className="card modal">{t("loading",lang)}</div></div>;
+  if(session===null) return <div className="modal-overlay"><div className="card modal"><p>{t("fb.expired",lang)}</p><button className="primary" onClick={onCancel}>{t("auto.cancel",lang)}</button></div></div>;
+
+  const toggle=(igId:string)=>setSelected(prev=>{const s=new Set(prev);s.has(igId)?s.delete(igId):s.add(igId);return s;});
+  const toggleAll=()=>setSelected(prev=>prev.size===session.pages.length?new Set():new Set(session.pages.map(p=>p.igId)));
+  const doConnect=async()=>{
+    if(selected.size===0)return;
+    setLoading(true);
+    try{await connectPages({sessionId,selectedIgIds:[...selected]});onDone();}
+    catch(e:any){alert(e.message);setLoading(false);}
+  };
+
+  return(
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="card modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420,width:"100%"}}>
+        <h3 style={{margin:"0 0 4px"}}>{t("fb.selectTitle",lang)}</h3>
+        <p className="subtitle" style={{marginBottom:16}}>{t("fb.selectSubtitle",lang)}</p>
+        <div style={{marginBottom:8}}>
+          <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"6px 0",opacity:0.7,fontSize:13}}>
+            <input type="checkbox" checked={selected.size===session.pages.length} onChange={toggleAll}/>
+            {t("fb.selectAll",lang)}
+          </label>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+          {session.pages.map(p=>(
+            <label key={p.igId} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"10px 12px",borderRadius:10,background:selected.has(p.igId)?"var(--accent-light,rgba(99,102,241,0.1))":"var(--bg2,#f5f5f5)",border:selected.has(p.igId)?"1.5px solid var(--accent,#6366f1)":"1.5px solid transparent",transition:"all .15s"}}>
+              <input type="checkbox" checked={selected.has(p.igId)} onChange={()=>toggle(p.igId)} style={{accentColor:"var(--accent,#6366f1)"}}/>
+              <div>
+                <div style={{fontWeight:600}}>@{p.igUsername}</div>
+                <div style={{fontSize:12,opacity:0.6}}>{p.pageName}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="secondary" onClick={onCancel} style={{flex:1}}>{t("auto.cancel",lang)}</button>
+          <button className="primary" onClick={doConnect} disabled={selected.size===0||loading} style={{flex:1}}>
+            {loading?t("fb.connecting",lang):`${t("fb.connect",lang)} (${selected.size})`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

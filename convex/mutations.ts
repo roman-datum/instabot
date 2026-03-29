@@ -191,6 +191,18 @@ export const createPendingFollowup = internalMutation({
   },
 });
 
+export const saveFbAuthSession = internalMutation({
+  args: { userToken: v.string(), pages: v.array(v.object({ pageId: v.string(), pageName: v.string(), pageToken: v.string(), igId: v.string(), igUsername: v.string() })), workspaceId: v.optional(v.id("workspaces")) },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("fbAuthSessions", { ...args, expiresAt: Date.now() + 10 * 60 * 1000 }); // 10 min
+  },
+});
+
+export const deleteFbAuthSession = internalMutation({
+  args: { sessionId: v.id("fbAuthSessions") },
+  handler: async (ctx, { sessionId }) => { await ctx.db.delete(sessionId); },
+});
+
 export const consumePendingFollowup = internalMutation({
   args: { clientInstagramId: v.string(), text: v.string() },
   handler: async (ctx, { clientInstagramId, text }) => {

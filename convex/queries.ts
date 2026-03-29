@@ -105,3 +105,18 @@ export const listAutomations = query({ args: {}, handler: async (ctx) => {
 
 export const listLogs = query({ args: { limit: v.optional(v.number()) }, handler: async (ctx, { limit }) => await ctx.db.query("logs").withIndex("by_time").order("desc").take(limit ?? 50) });
 export const listClients = query({ args: {}, handler: async (ctx) => await ctx.db.query("clients").collect() });
+
+export const getFbAuthSession = internalQuery({
+  args: { sessionId: v.id("fbAuthSessions") },
+  handler: async (ctx, { sessionId }) => await ctx.db.get(sessionId),
+});
+
+export const getFbAuthSessionPublic = query({
+  args: { sessionId: v.id("fbAuthSessions") },
+  handler: async (ctx, { sessionId }) => {
+    const s = await ctx.db.get(sessionId);
+    if (!s || s.expiresAt < Date.now()) return null;
+    // Return only safe fields (no tokens)
+    return { _id: s._id, pages: s.pages.map(p => ({ igId: p.igId, igUsername: p.igUsername, pageName: p.pageName })) };
+  },
+});
