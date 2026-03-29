@@ -82,6 +82,7 @@ http.route({ path: "/webhook", method: "POST", handler: httpAction(async (ctx, r
 
     if (entry.messaging) {
       for (const event of entry.messaging) {
+        if (event.message?.is_echo) continue; // skip echo events (bot's own sent messages)
         const senderId = String(event.sender?.id);
         const recipientId = String(event.recipient?.id);
         if (event.message?.text) {

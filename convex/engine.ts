@@ -9,8 +9,19 @@ export const handleDm = internalAction({
   args: { senderId: v.string(), recipientId: v.string(), text: v.string(), messageId: v.optional(v.string()) },
   handler: async (ctx, { senderId, recipientId, text }) => {
     let integ = await ctx.runQuery(internal.queries.getIntegrationByInstagramId, { instagramId: recipientId });
+    const foundBy = integ ? "primary" : "fallback";
     if (!integ) { const all = await ctx.runQuery(internal.queries.getAllIntegrations); integ = all.find((i: any) => i.instagramId !== senderId) || null; }
-    if (!integ || senderId === integ.instagramId) return;
+    if (!integ) {
+      await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_dm_skip", message: `NO INTEGRATION: recipientId=${recipientId} sender=${senderId}` });
+      return;
+    }
+    // Check echo: sender could be instagramId, igBusinessId, or pageId of the SAME integration
+    const isSelf = senderId === integ.instagramId || senderId === (integ.igBusinessId || "") || senderId === integ.pageId;
+    if (isSelf) {
+      console.log(`ECHO SKIP: sender=${senderId} is integ=${integ.pageName} (ig=${integ.instagramId} igba=${integ.igBusinessId})`);
+      return;
+    }
+    await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_dm_processing", message: `FOUND integ=${integ.pageName} (ig=${integ.instagramId} igba=${integ.igBusinessId}) by=${foundBy} recipientId=${recipientId} sender=${senderId} text="${text.slice(0, 50)}"` });
     await ctx.runMutation(internal.mutations.ensureClient, { instagramId: senderId, token: integ.pageAccessToken });
 
     const matchedAutoId = await ctx.runMutation(internal.mutations.consumePendingFollowup, { clientInstagramId: senderId, text });
@@ -29,7 +40,10 @@ export const handleDm = internalAction({
     }
 
     const matches = await ctx.runQuery(internal.queries.findMatchingTriggersForIntegration, { integrationId: integ._id, type: "dm", text, mediaId: "" });
-    if (matches.length === 0) return;
+    if (matches.length === 0) {
+      await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_dm_no_match", message: `NO TRIGGERS: integ=${integ.pageName} type=dm text="${text.slice(0, 80)}"` });
+      return;
+    }
     await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "dm_matched", message: `[@${integ.pageName}] ${text}` });
     for (const match of matches) {
       const actions = await ctx.runQuery(internal.queries.getActionsByAutomation, { automationId: match.automationId });
@@ -51,14 +65,27 @@ export const handleComment = internalAction({
   args: { commentId: v.string(), text: v.string(), senderId: v.string(), mediaId: v.string(), accountId: v.string() },
   handler: async (ctx, { commentId, text, senderId, mediaId, accountId }) => {
     let integ = await ctx.runQuery(internal.queries.getIntegrationByInstagramId, { instagramId: accountId });
+    const foundBy = integ ? "primary" : "fallback";
     if (!integ) { const all = await ctx.runQuery(internal.queries.getAllIntegrations); integ = all.find((i: any) => i.instagramId !== senderId) || null; }
-    if (!integ || senderId === integ.instagramId) return;
+    if (!integ) {
+      await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_comment_skip", message: `NO INTEGRATION: accountId=${accountId} sender=${senderId}` });
+      return;
+    }
+    const isSelfComment = senderId === integ.instagramId || senderId === (integ.igBusinessId || "") || senderId === integ.pageId;
+    if (isSelfComment) {
+      console.log(`COMMENT ECHO SKIP: sender=${senderId} is integ=${integ.pageName} (ig=${integ.instagramId} igba=${integ.igBusinessId})`);
+      return;
+    }
+    await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_comment_processing", message: `FOUND integ=${integ.pageName} (ig=${integ.instagramId} igba=${integ.igBusinessId}) by=${foundBy} accountId=${accountId} sender=${senderId} text="${text.slice(0, 50)}"` });
 
     const existing = await ctx.runQuery(internal.queries.checkRecentLog, { key: `comment:${commentId}` });
     if (existing) return;
 
     const matches = await ctx.runQuery(internal.queries.findMatchingTriggersForIntegration, { integrationId: integ._id, type: "comment", text, mediaId });
-    if (matches.length === 0) return;
+    if (matches.length === 0) {
+      await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "debug_comment_no_match", message: `NO TRIGGERS: integ=${integ.pageName} type=comment text="${text.slice(0, 80)}" mediaId=${mediaId}` });
+      return;
+    }
 
     await ctx.runMutation(internal.mutations.ensureClient, { instagramId: senderId, token: integ.pageAccessToken });
     await ctx.runMutation(internal.mutations.addLog, { clientInstagramId: senderId, eventType: "comment_matched", message: `[@${integ.pageName} post:${mediaId}] ${text} [dedup:comment:${commentId}]` });

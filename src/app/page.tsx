@@ -195,7 +195,7 @@ function AccountTab({ig,isSelected,onSelect,lang}:{ig:any;isSelected:boolean;onS
     <div className={`account-card${isSelected?" selected":""}`} onClick={onSelect}>
       <div className="name">@{ig.pageName||ig.instagramId}</div>
       <div className="meta">{t("accounts.expires", lang)} {exp}</div>
-      <button className="remove-btn" onClick={e=>{e.stopPropagation();remove({id:ig._id});}}>
+      <button className="remove-btn" onClick={e=>{e.stopPropagation();const name=ig.pageName||ig.instagramId;if(confirm(t("accounts.confirmDelete",lang).replace("{name}",name)))remove({id:ig._id});}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>

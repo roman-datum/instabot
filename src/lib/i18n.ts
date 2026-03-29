@@ -19,6 +19,7 @@ const dict = {
   "connect.fb.desc": { en: "Connect Instagram via Facebook Page", ru: "Подключить Instagram через Facebook-страницу" },
   "accounts.empty": { en: "Connect an Instagram account to get started", ru: "Подключите Instagram-аккаунт для начала работы" },
   "accounts.expires": { en: "until", ru: "до" },
+  "accounts.confirmDelete": { en: "Delete account @{name}? All automations for this account will also be deleted.", ru: "Удалить аккаунт @{name}? Все автоматизации этого аккаунта тоже будут удалены." },
   "auth.success": { en: "Instagram account connected successfully", ru: "Instagram-аккаунт успешно подключён" },
   "auth.error": { en: "Failed to connect account", ru: "Ошибка подключения аккаунта" },
   "loading": { en: "Loading...", ru: "Загрузка..." },

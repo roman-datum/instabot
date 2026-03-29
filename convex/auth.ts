@@ -88,7 +88,7 @@ export const exchangeAndSaveFb = internalAction({
 
       // 4. Subscribe Facebook Page to webhooks (EAA tokens work on graph.facebook.com, NOT graph.instagram.com)
       // Reference: datum-chatbot-backend uses graph.facebook.com/{page_id}/subscribed_apps
-      const subRes = await fetch(`https://graph.facebook.com/v25.0/${page.id}/subscribed_apps?subscribed_fields=feed&access_token=${pageToken}`, { method: "POST" });
+      const subRes = await fetch(`https://graph.facebook.com/v25.0/${page.id}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,feed&access_token=${pageToken}`, { method: "POST" });
       const subData = await subRes.json();
       console.log(`Webhook sub for ${igUsername} (page:${page.id}):`, JSON.stringify(subData));
 
