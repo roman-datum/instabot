@@ -72,7 +72,7 @@ export const exchangeAndSaveFb = internalAction({
     const permsData = await permsRes.json();
     console.log("FB Permissions:", JSON.stringify(permsData));
 
-    // Get ALL pages with pagination
+    // Get ALL pages with pagination via me/accounts
     let allPages: any[] = [];
     let pagesUrl: string | null = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&limit=100&access_token=${longUserToken}`;
     let rawFirstResponse: any = null;
@@ -82,6 +82,22 @@ export const exchangeAndSaveFb = internalAction({
       if (!rawFirstResponse) rawFirstResponse = pagesData;
       if (pagesData.data?.length) allPages.push(...pagesData.data);
       pagesUrl = pagesData.paging?.next || null;
+    }
+
+    // Fallback: if me/accounts returned empty (happens when user selected "all pages" via Business Manager),
+    // try Business API: me/businesses -> owned_pages
+    if (allPages.length === 0) {
+      const bizRes = await fetch(`https://graph.facebook.com/v25.0/me/businesses?fields=id,name,owned_pages{id,name,access_token,instagram_business_account{id,username,name}}&limit=100&access_token=${longUserToken}`);
+      const bizData = await bizRes.json();
+      await ctx.runMutation(internal.mutations.addLog, {
+        clientInstagramId: "auth", eventType: "fb_auth_biz_fallback",
+        message: `businesses_raw=${JSON.stringify(bizData).slice(0, 500)}`,
+      });
+      for (const biz of bizData.data || []) {
+        for (const page of biz.owned_pages?.data || []) {
+          allPages.push(page);
+        }
+      }
     }
 
     // Filter pages with Instagram accounts

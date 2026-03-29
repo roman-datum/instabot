@@ -15,7 +15,7 @@ function getIgAuthUrl(workspaceId: string) {
 }
 function getFbAuthUrl(workspaceId: string) {
   const r = `${CONVEX_SITE_URL}/auth/fb-callback`;
-  return `https://www.facebook.com/v25.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(r)}&scope=pages_show_list,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_comments,instagram_manage_messages&response_type=code&state=${encodeURIComponent(workspaceId)}`;
+  return `https://www.facebook.com/v25.0/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(r)}&response_type=code&auth_type=rerequest&config_id=432702899234364&state=${encodeURIComponent(workspaceId)}`;
 }
 
 type BtnForm={text:string;url:string};
