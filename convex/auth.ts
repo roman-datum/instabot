@@ -67,12 +67,19 @@ export const exchangeAndSaveFb = internalAction({
     const longData = await longRes.json();
     const longUserToken = longData.access_token || tokenData.access_token;
 
+    // Check granted permissions
+    const permsRes = await fetch(`https://graph.facebook.com/v25.0/me/permissions?access_token=${longUserToken}`);
+    const permsData = await permsRes.json();
+    console.log("FB Permissions:", JSON.stringify(permsData));
+
     // Get ALL pages with pagination
     let allPages: any[] = [];
     let pagesUrl: string | null = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&limit=100&access_token=${longUserToken}`;
+    let rawFirstResponse: any = null;
     while (pagesUrl) {
       const pagesRes: Response = await fetch(pagesUrl);
       const pagesData: any = await pagesRes.json();
+      if (!rawFirstResponse) rawFirstResponse = pagesData;
       if (pagesData.data?.length) allPages.push(...pagesData.data);
       pagesUrl = pagesData.paging?.next || null;
     }
@@ -86,14 +93,23 @@ export const exchangeAndSaveFb = internalAction({
       igUsername: String(p.instagram_business_account.username || p.instagram_business_account.name || p.instagram_business_account.id),
     }));
 
+    const grantedPerms = (permsData.data || []).filter((p: any) => p.status === "granted").map((p: any) => p.permission).join(",");
     await ctx.runMutation(internal.mutations.addLog, {
       clientInstagramId: "auth", eventType: "fb_auth_pages",
-      message: `Found ${allPages.length} pages, ${igPages.length} with IG: ${igPages.map(p => `@${p.igUsername}`).join(", ").slice(0, 150)}`,
+      message: `perms=[${grantedPerms}] raw_data_len=${rawFirstResponse?.data?.length ?? "null"} pages=${allPages.length} ig=${igPages.length}: ${igPages.map(p => `@${p.igUsername}`).join(", ").slice(0, 100)}`,
+    });
+    // DEBUG: log full raw response and token prefix
+    await ctx.runMutation(internal.mutations.addLog, {
+      clientInstagramId: "auth", eventType: "fb_auth_debug",
+      message: `token_prefix=${longUserToken.slice(0, 20)} raw=${JSON.stringify(rawFirstResponse).slice(0, 500)}`,
     });
 
     if (igPages.length === 0) {
+      if (allPages.length === 0) {
+        throw new Error("Facebook не вернул ни одной страницы. Выберите конкретные страницы в диалоге Facebook вместо «все текущие и будущие».");
+      }
       const pageNames = allPages.map((p: any) => p.name).join(", ");
-      throw new Error(`No Instagram Business Account linked to your Pages (${pageNames}). Link Instagram to a Facebook Page first.`);
+      throw new Error(`К страницам (${pageNames}) не привязан Instagram Business. Привяжите Instagram к Facebook-странице.`);
     }
 
     // If only 1 page with IG — connect directly (no need for selector)
